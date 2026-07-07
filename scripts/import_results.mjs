@@ -51,32 +51,36 @@ playedWeeks.forEach((n) => {
 });
 
 console.log(`Transcribed weeks: ${playedWeeks.join(", ")}`);
-console.log(`\n${"team".padEnd(16)} transcribed   yahoo   missing-weeks`);
+console.log(`\n${"team".padEnd(16)} transcribed   yahoo    PF check`);
 let anyGap = false;
 DATA.standings.forEach((s) => {
   const t = tally[s.id];
   const gapW = s.w - t.w, gapL = s.l - t.l;
   if (gapW < 0 || gapL < 0) throw new Error(`${s.id}: transcription shows MORE games than Yahoo record — check scores`);
   if (gapW + gapL > 0) anyGap = true;
-  console.log(`${s.id.padEnd(16)} ${`${t.w}-${t.l}${t.t ? "-" + t.t : ""}`.padEnd(12)}${`${s.w}-${s.l}${s.t ? "-" + s.t : ""}`.padEnd(8)}${gapW + gapL ? `${gapW}W ${gapL}L unaccounted` : "✓ complete"}`);
+  // Yahoo's official Pts column verifies the transcription to the point.
+  const pfNote = s.pts == null ? "" :
+    t.pf === s.pts ? `PF ${t.pf} ✓ matches Yahoo` : `PF ${t.pf} ≠ Yahoo ${s.pts} — CHECK SCORES`;
+  console.log(`${s.id.padEnd(16)} ${`${t.w}-${t.l}${t.t ? "-" + t.t : ""}`.padEnd(12)}${`${s.w}-${s.l}${s.t ? "-" + s.t : ""}`.padEnd(8)} ${gapW + gapL ? `${gapW}W ${gapL}L unaccounted · ` : ""}${pfNote}`);
 });
-if (anyGap) console.log("\n⚠ Some games aren't in the transcript (weeks 14-15?) — records import from Yahoo's totals anyway; PF/PA only covers transcribed weeks. Add the missing weeks to the JSON and re-run when you have them.");
+if (anyGap) console.log("\n⚠ Some games aren't in the transcript — records import from Yahoo's totals anyway.");
 
 // ---- build the week map ---------------------------------------------------------
-let seasonEnd = null;
-try {
-  seasonEnd = (await MLB.seasonInfo(SEASON))?.regularSeasonEndDate || null;
-} catch (e) { console.warn("⚠ Couldn't reach the MLB API for the season end date — defaulting to 2026-09-27."); }
-seasonEnd = seasonEnd || "2026-09-27";
-
+// Total/regular week counts come from Yahoo (23 regular + weeks 24-26 playoffs).
+const totalWeeks = DATA.totalWeeks || 26;
+const regularWeeks = DATA.regularSeasonWeeks || SEASON_STRUCTURE.regularWeeks;
 const weeks = [{ n: 1, start: DATA.week1Start, end: DATA.week1End, type: "regular" }];
 let cursor = addDays(DATA.week1End, 1);
-while (addDays(cursor, 6) <= seasonEnd) {
-  weeks.push({ n: weeks.length + 1, start: cursor, end: addDays(cursor, 6), type: "regular" });
+while (weeks.length < totalWeeks) {
+  const n = weeks.length + 1;
+  weeks.push({ n, start: cursor, end: addDays(cursor, 6), type: n <= regularWeeks ? "regular" : "playoff" });
   cursor = addDays(cursor, 7);
 }
-const po = Math.min(SEASON_STRUCTURE.playoffWeeks, weeks.length - 1);
-weeks.slice(-po).forEach((w) => { w.type = "playoff"; });
+try {
+  const seasonEnd = (await MLB.seasonInfo(SEASON))?.regularSeasonEndDate;
+  if (seasonEnd && weeks[weeks.length - 1].end > seasonEnd)
+    console.log(`⚠ Week ${totalWeeks} ends ${weeks[weeks.length - 1].end}, after MLB's season end ${seasonEnd}.`);
+} catch (e) { /* offline — skip the calendar cross-check */ }
 
 const current = weeks.find((w) => w.start <= today && today <= w.end);
 const finishedByCalendar = weeks.filter((w) => w.end < today).length;
@@ -133,11 +137,13 @@ Object.entries(DATA.upcoming || {}).forEach(([n, mus]) => {
   });
 });
 
-// Teams: Yahoo's records/ranks are authoritative; PF/PA from transcribed weeks.
+// Teams: Yahoo's records/ranks/Pts are authoritative; PA from the transcript;
+// remaining FAAB comes from Yahoo's Waiver Budget column.
 DATA.standings.forEach((s) => {
   batch.set(L.collection("teams").doc(s.id), {
-    record: { w: s.w, l: s.l, t: s.t, pf: Math.round(tally[s.id].pf), pa: Math.round(tally[s.id].pa) },
+    record: { w: s.w, l: s.l, t: s.t, pf: s.pts ?? Math.round(tally[s.id].pf), pa: Math.round(tally[s.id].pa) },
     seed: s.rank,
+    ...(s.faab != null ? { faabRemaining: s.faab } : {}),
   }, { merge: true });
 });
 

@@ -1,128 +1,899 @@
 {
-  "comment": "Real 2026 Yahoo league history. weeks: [home, homePts, away, awayPts] per matchup. standings: current records/ranks from Yahoo. week1Start/End define the opening week; every later week is Mon-Sun (records show 15 finished weeks, implying a short opening week — adjust these dates if import_results warns). Weeks 14-15 finished but screenshots are pending — add them here and re-run scripts/import_results.mjs.",
-  "week1Start": "2026-03-26",
-  "week1End": "2026-03-29",
-  "standings": [
-    { "id": "acuna-matata",  "w": 13, "l": 2,  "t": 0, "rank": 1 },
-    { "id": "rally-cats",    "w": 11, "l": 4,  "t": 0, "rank": 2 },
-    { "id": "speedster",     "w": 10, "l": 5,  "t": 0, "rank": 3 },
-    { "id": "jump",          "w": 10, "l": 5,  "t": 0, "rank": 4 },
-    { "id": "hogans-heroes", "w": 9,  "l": 6,  "t": 0, "rank": 5 },
-    { "id": "witt-wisdom",   "w": 8,  "l": 7,  "t": 0, "rank": 6 },
-    { "id": "en-fuego",      "w": 6,  "l": 9,  "t": 0, "rank": 7 },
-    { "id": "beer-snobs",    "w": 6,  "l": 9,  "t": 0, "rank": 8 },
-    { "id": "ozzies-fish",   "w": 6,  "l": 9,  "t": 0, "rank": 9 },
-    { "id": "cousin-vinnie", "w": 5,  "l": 10, "t": 0, "rank": 10 },
-    { "id": "ace-dan",       "w": 4,  "l": 11, "t": 0, "rank": 11 },
-    { "id": "baldwin-bro",   "w": 2,  "l": 13, "t": 0, "rank": 12 }
-  ],
-  "weeks": {
-    "1": [
-      ["acuna-matata", 230, "ace-dan", 193],
-      ["beer-snobs", 174, "cousin-vinnie", 199],
-      ["en-fuego", 102, "hogans-heroes", 148],
-      ["ozzies-fish", 125, "witt-wisdom", 178],
-      ["jump", 167, "baldwin-bro", 128],
-      ["rally-cats", 186, "speedster", 119]
-    ],
-    "2": [
-      ["acuna-matata", 314, "baldwin-bro", 295],
-      ["beer-snobs", 257, "hogans-heroes", 386],
-      ["en-fuego", 362, "witt-wisdom", 309],
-      ["cousin-vinnie", 280, "ace-dan", 322],
-      ["ozzies-fish", 242, "rally-cats", 333],
-      ["jump", 323, "speedster", 344]
-    ],
-    "3": [
-      ["acuna-matata", 330, "speedster", 306],
-      ["beer-snobs", 350, "witt-wisdom", 374],
-      ["en-fuego", 336, "ozzies-fish", 348],
-      ["cousin-vinnie", 332, "baldwin-bro", 261],
-      ["jump", 306, "rally-cats", 255],
-      ["ace-dan", 263, "hogans-heroes", 315]
-    ],
-    "4": [
-      ["acuna-matata", 361, "rally-cats", 239],
-      ["beer-snobs", 273, "en-fuego", 355],
-      ["cousin-vinnie", 217, "speedster", 292],
-      ["ozzies-fish", 337, "jump", 294],
-      ["witt-wisdom", 385, "ace-dan", 366],
-      ["hogans-heroes", 339, "baldwin-bro", 332]
-    ],
-    "5": [
-      ["acuna-matata", 412, "jump", 346],
-      ["beer-snobs", 278, "ozzies-fish", 281],
-      ["en-fuego", 326, "ace-dan", 329],
-      ["cousin-vinnie", 194, "rally-cats", 316],
-      ["witt-wisdom", 346, "baldwin-bro", 354],
-      ["hogans-heroes", 316, "speedster", 431]
-    ],
-    "6": [
-      ["acuna-matata", 362, "ozzies-fish", 202],
-      ["beer-snobs", 406, "ace-dan", 271],
-      ["en-fuego", 330, "baldwin-bro", 258],
-      ["cousin-vinnie", 223, "jump", 310],
-      ["rally-cats", 238, "hogans-heroes", 348],
-      ["witt-wisdom", 374, "speedster", 285]
-    ],
-    "7": [
-      ["acuna-matata", 260, "cousin-vinnie", 224],
-      ["beer-snobs", 344, "baldwin-bro", 301],
-      ["en-fuego", 340, "speedster", 415],
-      ["ozzies-fish", 296, "ace-dan", 266],
-      ["jump", 337, "hogans-heroes", 324],
-      ["rally-cats", 360, "witt-wisdom", 338]
-    ],
-    "8": [
-      ["acuna-matata", 341, "hogans-heroes", 312],
-      ["beer-snobs", 336, "speedster", 398],
-      ["en-fuego", 257, "rally-cats", 364],
-      ["cousin-vinnie", 252, "ozzies-fish", 302],
-      ["jump", 340, "witt-wisdom", 349],
-      ["ace-dan", 293, "baldwin-bro", 289]
-    ],
-    "9": [
-      ["acuna-matata", 432, "witt-wisdom", 368],
-      ["beer-snobs", 255, "rally-cats", 325],
-      ["en-fuego", 254, "jump", 383],
-      ["cousin-vinnie", 318, "hogans-heroes", 277],
-      ["ozzies-fish", 273, "baldwin-bro", 269],
-      ["ace-dan", 293, "speedster", 380]
-    ],
-    "10": [
-      ["acuna-matata", 472, "en-fuego", 345],
-      ["beer-snobs", 299, "jump", 443],
-      ["cousin-vinnie", 299, "witt-wisdom", 278],
-      ["ozzies-fish", 264, "hogans-heroes", 324],
-      ["rally-cats", 307, "ace-dan", 251],
-      ["speedster", 413, "baldwin-bro", 360]
-    ],
-    "11": [
-      ["acuna-matata", 307, "beer-snobs", 300],
-      ["en-fuego", 355, "cousin-vinnie", 291],
-      ["ozzies-fish", 284, "speedster", 305],
-      ["jump", 409, "ace-dan", 341],
-      ["rally-cats", 317, "baldwin-bro", 195],
-      ["witt-wisdom", 240, "hogans-heroes", 272]
-    ],
-    "12": [
-      ["acuna-matata", 258, "ace-dan", 308],
-      ["beer-snobs", 240, "cousin-vinnie", 188],
-      ["en-fuego", 356, "hogans-heroes", 278],
-      ["ozzies-fish", 257, "witt-wisdom", 351],
-      ["jump", 352, "baldwin-bro", 291],
-      ["rally-cats", 347, "speedster", 301]
-    ],
-    "13": [
-      ["acuna-matata", 513, "baldwin-bro", 297],
-      ["beer-snobs", 321, "hogans-heroes", 316],
-      ["en-fuego", 301, "witt-wisdom", 312],
-      ["cousin-vinnie", 193, "ace-dan", 183],
-      ["ozzies-fish", 200, "rally-cats", 327],
-      ["jump", 378, "speedster", 362]
-    ]
+ "comment": "Real 2026 Yahoo league history, transcribed from the league's screenshots. weeks: [home, homePts, away, awayPts]. upcoming: [home, away]. standings: current records, official season Pts (PF), and remaining FAAB from Yahoo's Standings page. 23 regular weeks; playoffs are weeks 24-26. Records show 15 finished weeks (short opening week).",
+ "week1Start": "2026-03-26",
+ "week1End": "2026-03-29",
+ "standings": [
+  {
+   "id": "acuna-matata",
+   "w": 13,
+   "l": 2,
+   "t": 0,
+   "rank": 1,
+   "pts": 5293,
+   "faab": 28
   },
-  "upcoming": {
-    "comment": "Add future weeks here as [home, away] pairs when you have the Yahoo schedule, e.g. \"16\": [[\"acuna-matata\",\"rally-cats\"], ...]"
+  {
+   "id": "rally-cats",
+   "w": 11,
+   "l": 4,
+   "t": 0,
+   "rank": 2,
+   "pts": 4541,
+   "faab": 89
+  },
+  {
+   "id": "speedster",
+   "w": 10,
+   "l": 5,
+   "t": 0,
+   "rank": 3,
+   "pts": 5111,
+   "faab": 53
+  },
+  {
+   "id": "jump",
+   "w": 10,
+   "l": 5,
+   "t": 0,
+   "rank": 4,
+   "pts": 5043,
+   "faab": 1
+  },
+  {
+   "id": "hogans-heroes",
+   "w": 9,
+   "l": 6,
+   "t": 0,
+   "rank": 5,
+   "pts": 4754,
+   "faab": 42
+  },
+  {
+   "id": "witt-wisdom",
+   "w": 8,
+   "l": 7,
+   "t": 0,
+   "rank": 6,
+   "pts": 4798,
+   "faab": 52
+  },
+  {
+   "id": "en-fuego",
+   "w": 6,
+   "l": 9,
+   "t": 0,
+   "rank": 7,
+   "pts": 4705,
+   "faab": 56
+  },
+  {
+   "id": "beer-snobs",
+   "w": 6,
+   "l": 9,
+   "t": 0,
+   "rank": 8,
+   "pts": 4534,
+   "faab": 67
+  },
+  {
+   "id": "ozzies-fish",
+   "w": 6,
+   "l": 9,
+   "t": 0,
+   "rank": 9,
+   "pts": 3959,
+   "faab": 94
+  },
+  {
+   "id": "cousin-vinnie",
+   "w": 5,
+   "l": 10,
+   "t": 0,
+   "rank": 10,
+   "pts": 3662,
+   "faab": 94
+  },
+  {
+   "id": "ace-dan",
+   "w": 4,
+   "l": 11,
+   "t": 0,
+   "rank": 11,
+   "pts": 4060,
+   "faab": 93
+  },
+  {
+   "id": "baldwin-bro",
+   "w": 2,
+   "l": 13,
+   "t": 0,
+   "rank": 12,
+   "pts": 4394,
+   "faab": 81
   }
+ ],
+ "weeks": {
+  "1": [
+   [
+    "acuna-matata",
+    230,
+    "ace-dan",
+    193
+   ],
+   [
+    "beer-snobs",
+    174,
+    "cousin-vinnie",
+    199
+   ],
+   [
+    "en-fuego",
+    102,
+    "hogans-heroes",
+    148
+   ],
+   [
+    "ozzies-fish",
+    125,
+    "witt-wisdom",
+    178
+   ],
+   [
+    "jump",
+    167,
+    "baldwin-bro",
+    128
+   ],
+   [
+    "rally-cats",
+    186,
+    "speedster",
+    119
+   ]
+  ],
+  "2": [
+   [
+    "acuna-matata",
+    314,
+    "baldwin-bro",
+    295
+   ],
+   [
+    "beer-snobs",
+    257,
+    "hogans-heroes",
+    386
+   ],
+   [
+    "en-fuego",
+    362,
+    "witt-wisdom",
+    309
+   ],
+   [
+    "cousin-vinnie",
+    280,
+    "ace-dan",
+    322
+   ],
+   [
+    "ozzies-fish",
+    242,
+    "rally-cats",
+    333
+   ],
+   [
+    "jump",
+    323,
+    "speedster",
+    344
+   ]
+  ],
+  "3": [
+   [
+    "acuna-matata",
+    330,
+    "speedster",
+    306
+   ],
+   [
+    "beer-snobs",
+    350,
+    "witt-wisdom",
+    374
+   ],
+   [
+    "en-fuego",
+    336,
+    "ozzies-fish",
+    348
+   ],
+   [
+    "cousin-vinnie",
+    332,
+    "baldwin-bro",
+    261
+   ],
+   [
+    "jump",
+    306,
+    "rally-cats",
+    255
+   ],
+   [
+    "ace-dan",
+    263,
+    "hogans-heroes",
+    315
+   ]
+  ],
+  "4": [
+   [
+    "acuna-matata",
+    361,
+    "rally-cats",
+    239
+   ],
+   [
+    "beer-snobs",
+    273,
+    "en-fuego",
+    355
+   ],
+   [
+    "cousin-vinnie",
+    217,
+    "speedster",
+    292
+   ],
+   [
+    "ozzies-fish",
+    337,
+    "jump",
+    294
+   ],
+   [
+    "witt-wisdom",
+    385,
+    "ace-dan",
+    366
+   ],
+   [
+    "hogans-heroes",
+    339,
+    "baldwin-bro",
+    332
+   ]
+  ],
+  "5": [
+   [
+    "acuna-matata",
+    412,
+    "jump",
+    346
+   ],
+   [
+    "beer-snobs",
+    278,
+    "ozzies-fish",
+    281
+   ],
+   [
+    "en-fuego",
+    326,
+    "ace-dan",
+    329
+   ],
+   [
+    "cousin-vinnie",
+    194,
+    "rally-cats",
+    316
+   ],
+   [
+    "witt-wisdom",
+    346,
+    "baldwin-bro",
+    354
+   ],
+   [
+    "hogans-heroes",
+    316,
+    "speedster",
+    431
+   ]
+  ],
+  "6": [
+   [
+    "acuna-matata",
+    362,
+    "ozzies-fish",
+    202
+   ],
+   [
+    "beer-snobs",
+    406,
+    "ace-dan",
+    271
+   ],
+   [
+    "en-fuego",
+    330,
+    "baldwin-bro",
+    258
+   ],
+   [
+    "cousin-vinnie",
+    223,
+    "jump",
+    310
+   ],
+   [
+    "rally-cats",
+    238,
+    "hogans-heroes",
+    348
+   ],
+   [
+    "witt-wisdom",
+    374,
+    "speedster",
+    285
+   ]
+  ],
+  "7": [
+   [
+    "acuna-matata",
+    260,
+    "cousin-vinnie",
+    224
+   ],
+   [
+    "beer-snobs",
+    344,
+    "baldwin-bro",
+    301
+   ],
+   [
+    "en-fuego",
+    340,
+    "speedster",
+    415
+   ],
+   [
+    "ozzies-fish",
+    296,
+    "ace-dan",
+    266
+   ],
+   [
+    "jump",
+    337,
+    "hogans-heroes",
+    324
+   ],
+   [
+    "rally-cats",
+    360,
+    "witt-wisdom",
+    338
+   ]
+  ],
+  "8": [
+   [
+    "acuna-matata",
+    341,
+    "hogans-heroes",
+    312
+   ],
+   [
+    "beer-snobs",
+    336,
+    "speedster",
+    398
+   ],
+   [
+    "en-fuego",
+    257,
+    "rally-cats",
+    364
+   ],
+   [
+    "cousin-vinnie",
+    252,
+    "ozzies-fish",
+    302
+   ],
+   [
+    "jump",
+    340,
+    "witt-wisdom",
+    349
+   ],
+   [
+    "ace-dan",
+    293,
+    "baldwin-bro",
+    289
+   ]
+  ],
+  "9": [
+   [
+    "acuna-matata",
+    432,
+    "witt-wisdom",
+    368
+   ],
+   [
+    "beer-snobs",
+    255,
+    "rally-cats",
+    325
+   ],
+   [
+    "en-fuego",
+    254,
+    "jump",
+    383
+   ],
+   [
+    "cousin-vinnie",
+    318,
+    "hogans-heroes",
+    277
+   ],
+   [
+    "ozzies-fish",
+    273,
+    "baldwin-bro",
+    269
+   ],
+   [
+    "ace-dan",
+    293,
+    "speedster",
+    380
+   ]
+  ],
+  "10": [
+   [
+    "acuna-matata",
+    472,
+    "en-fuego",
+    345
+   ],
+   [
+    "beer-snobs",
+    299,
+    "jump",
+    443
+   ],
+   [
+    "cousin-vinnie",
+    299,
+    "witt-wisdom",
+    278
+   ],
+   [
+    "ozzies-fish",
+    264,
+    "hogans-heroes",
+    324
+   ],
+   [
+    "rally-cats",
+    307,
+    "ace-dan",
+    251
+   ],
+   [
+    "speedster",
+    413,
+    "baldwin-bro",
+    360
+   ]
+  ],
+  "11": [
+   [
+    "acuna-matata",
+    307,
+    "beer-snobs",
+    300
+   ],
+   [
+    "en-fuego",
+    355,
+    "cousin-vinnie",
+    291
+   ],
+   [
+    "ozzies-fish",
+    284,
+    "speedster",
+    305
+   ],
+   [
+    "jump",
+    409,
+    "ace-dan",
+    341
+   ],
+   [
+    "rally-cats",
+    317,
+    "baldwin-bro",
+    195
+   ],
+   [
+    "witt-wisdom",
+    240,
+    "hogans-heroes",
+    272
+   ]
+  ],
+  "12": [
+   [
+    "acuna-matata",
+    258,
+    "ace-dan",
+    308
+   ],
+   [
+    "beer-snobs",
+    240,
+    "cousin-vinnie",
+    188
+   ],
+   [
+    "en-fuego",
+    356,
+    "hogans-heroes",
+    278
+   ],
+   [
+    "ozzies-fish",
+    257,
+    "witt-wisdom",
+    351
+   ],
+   [
+    "jump",
+    352,
+    "baldwin-bro",
+    291
+   ],
+   [
+    "rally-cats",
+    347,
+    "speedster",
+    301
+   ]
+  ],
+  "13": [
+   [
+    "acuna-matata",
+    513,
+    "baldwin-bro",
+    297
+   ],
+   [
+    "beer-snobs",
+    321,
+    "hogans-heroes",
+    316
+   ],
+   [
+    "en-fuego",
+    301,
+    "witt-wisdom",
+    312
+   ],
+   [
+    "cousin-vinnie",
+    193,
+    "ace-dan",
+    183
+   ],
+   [
+    "ozzies-fish",
+    200,
+    "rally-cats",
+    327
+   ],
+   [
+    "jump",
+    378,
+    "speedster",
+    362
+   ]
+  ],
+  "14": [
+   [
+    "acuna-matata",
+    338,
+    "speedster",
+    420
+   ],
+   [
+    "beer-snobs",
+    327,
+    "witt-wisdom",
+    312
+   ],
+   [
+    "en-fuego",
+    340,
+    "ozzies-fish",
+    257
+   ],
+   [
+    "cousin-vinnie",
+    239,
+    "baldwin-bro",
+    360
+   ],
+   [
+    "jump",
+    268,
+    "rally-cats",
+    344
+   ],
+   [
+    "ace-dan",
+    165,
+    "hogans-heroes",
+    379
+   ]
+  ],
+  "15": [
+   [
+    "acuna-matata",
+    363,
+    "rally-cats",
+    283
+   ],
+   [
+    "beer-snobs",
+    374,
+    "en-fuego",
+    346
+   ],
+   [
+    "cousin-vinnie",
+    213,
+    "speedster",
+    340
+   ],
+   [
+    "ozzies-fish",
+    291,
+    "jump",
+    387
+   ],
+   [
+    "witt-wisdom",
+    284,
+    "ace-dan",
+    216
+   ],
+   [
+    "hogans-heroes",
+    420,
+    "baldwin-bro",
+    404
+   ]
+  ]
+ },
+ "upcoming": {
+  "16": [
+   [
+    "acuna-matata",
+    "jump"
+   ],
+   [
+    "beer-snobs",
+    "ozzies-fish"
+   ],
+   [
+    "en-fuego",
+    "ace-dan"
+   ],
+   [
+    "cousin-vinnie",
+    "rally-cats"
+   ],
+   [
+    "witt-wisdom",
+    "baldwin-bro"
+   ],
+   [
+    "hogans-heroes",
+    "speedster"
+   ]
+  ],
+  "17": [
+   [
+    "acuna-matata",
+    "ozzies-fish"
+   ],
+   [
+    "beer-snobs",
+    "ace-dan"
+   ],
+   [
+    "en-fuego",
+    "baldwin-bro"
+   ],
+   [
+    "cousin-vinnie",
+    "jump"
+   ],
+   [
+    "rally-cats",
+    "hogans-heroes"
+   ],
+   [
+    "witt-wisdom",
+    "speedster"
+   ]
+  ],
+  "18": [
+   [
+    "acuna-matata",
+    "cousin-vinnie"
+   ],
+   [
+    "beer-snobs",
+    "baldwin-bro"
+   ],
+   [
+    "en-fuego",
+    "speedster"
+   ],
+   [
+    "ozzies-fish",
+    "ace-dan"
+   ],
+   [
+    "jump",
+    "hogans-heroes"
+   ],
+   [
+    "rally-cats",
+    "witt-wisdom"
+   ]
+  ],
+  "19": [
+   [
+    "acuna-matata",
+    "hogans-heroes"
+   ],
+   [
+    "beer-snobs",
+    "speedster"
+   ],
+   [
+    "en-fuego",
+    "rally-cats"
+   ],
+   [
+    "cousin-vinnie",
+    "ozzies-fish"
+   ],
+   [
+    "jump",
+    "witt-wisdom"
+   ],
+   [
+    "ace-dan",
+    "baldwin-bro"
+   ]
+  ],
+  "20": [
+   [
+    "acuna-matata",
+    "witt-wisdom"
+   ],
+   [
+    "beer-snobs",
+    "rally-cats"
+   ],
+   [
+    "en-fuego",
+    "jump"
+   ],
+   [
+    "cousin-vinnie",
+    "hogans-heroes"
+   ],
+   [
+    "ozzies-fish",
+    "baldwin-bro"
+   ],
+   [
+    "ace-dan",
+    "speedster"
+   ]
+  ],
+  "21": [
+   [
+    "acuna-matata",
+    "en-fuego"
+   ],
+   [
+    "beer-snobs",
+    "jump"
+   ],
+   [
+    "cousin-vinnie",
+    "witt-wisdom"
+   ],
+   [
+    "ozzies-fish",
+    "hogans-heroes"
+   ],
+   [
+    "rally-cats",
+    "ace-dan"
+   ],
+   [
+    "speedster",
+    "baldwin-bro"
+   ]
+  ],
+  "22": [
+   [
+    "acuna-matata",
+    "beer-snobs"
+   ],
+   [
+    "en-fuego",
+    "cousin-vinnie"
+   ],
+   [
+    "ozzies-fish",
+    "speedster"
+   ],
+   [
+    "jump",
+    "ace-dan"
+   ],
+   [
+    "rally-cats",
+    "baldwin-bro"
+   ],
+   [
+    "witt-wisdom",
+    "hogans-heroes"
+   ]
+  ],
+  "23": [
+   [
+    "acuna-matata",
+    "ace-dan"
+   ],
+   [
+    "beer-snobs",
+    "cousin-vinnie"
+   ],
+   [
+    "en-fuego",
+    "hogans-heroes"
+   ],
+   [
+    "ozzies-fish",
+    "witt-wisdom"
+   ],
+   [
+    "jump",
+    "baldwin-bro"
+   ],
+   [
+    "rally-cats",
+    "speedster"
+   ]
+  ]
+ },
+ "regularSeasonWeeks": 23,
+ "totalWeeks": 26
 }
