@@ -66,10 +66,20 @@ function isNoise(line) {
   if (/^(Pos|Player)$/i.test(line)) return true;                    // Yahoo table headers
   if (POS_SET.has(line.replace(/[\s\t]+$/, ""))) return true;      // bare slot cell ("C", "BN", …)
   if (/^\d{1,2}:\d{2}\s*(am|pm)/i.test(line)) return true;         // game times
-  // club + position list line, e.g. "SEA - C" / "STL - 2B,3B,SS" / "LAD - Util"
-  const m = line.match(/^[A-Z]{2,3}\s*-\s*(.+)$/);
-  if (m && m[1].split(/[,\s]+/).filter(Boolean).every((tok) => POS_SET.has(tok))) return true;
   return false;
+}
+
+// Club + position list line under each name ("STL - 2B,3B,SS" / "LAD - Util"):
+// this IS the player's current Yahoo eligibility — keep it as the season-start
+// baseline instead of guessing from stats. Util maps to DH (any-hitter).
+const YAHOO_POS_MAP = { LF: "OF", CF: "OF", RF: "OF", Util: "DH", UTIL: "DH" };
+function yahooPositionsFrom(line) {
+  const m = line.match(/^[A-Z]{2,3}\s*-\s*(.+)$/);
+  if (!m) return null;
+  const toks = m[1].split(/[,\s]+/).filter(Boolean);
+  if (!toks.length || !toks.every((x) => POS_SET.has(x))) return null;
+  return [...new Set(toks.map((x) => YAHOO_POS_MAP[x] || x))]
+    .filter((x) => !["P", "BN", "IL", "NA", "IF", "INF"].includes(x));
 }
 
 const teams = [];
@@ -79,7 +89,14 @@ for (const raw of readFileSync(FILE, "utf8").split(/\r?\n/)) {
   if (!line) continue;
   const head = matchTeamHeader(line);
   if (head) { cur = { ...head, players: [] }; teams.push(cur); continue; }
-  if (!cur || isNoise(line)) continue;
+  if (!cur) continue;
+  const yp = yahooPositionsFrom(line);
+  if (yp !== null) {
+    const lastPl = cur.players[cur.players.length - 1];
+    if (lastPl && !lastPl.yahooPositions && yp.length) lastPl.yahooPositions = yp;
+    continue;
+  }
+  if (isNoise(line)) continue;
 
   // Yahoo glues the IL tag onto the name ("Mike TroutIL10Player Note") —
   // capture it before stripping so IL slots work from day one.
@@ -93,7 +110,7 @@ for (const raw of readFileSync(FILE, "utf8").split(/\r?\n/)) {
     .replace(/\s+(Player Notes?|Notes?|DTD|IL\d*|NA)\b.*$/i, "")
     .replace(/\s+[A-Z]{2,3}\s*$/, "")       // trailing club like "KC"/"LAD" (old format)
     .trim();
-  if (name) cur.players.push({ line, name, roleHint, ilTag });
+  if (name) cur.players.push({ line, name, roleHint, ilTag, yahooPositions: null });
 }
 console.log(`Parsed ${teams.length} teams, ${teams.reduce((s, t) => s + t.players.length, 0)} players from ${FILE}`);
 if (!teams.length) process.exit(1);
@@ -101,7 +118,7 @@ if (!teams.length) process.exit(1);
 if (flag("parse-only")) {
   teams.forEach((t) => {
     console.log(`\n## ${t.team.name}${t.record ? ` (${t.record.w}-${t.record.l}${t.record.t ? "-" + t.record.t : ""})` : ""} — ${t.players.length} players`);
-    t.players.forEach((p) => console.log(`  ${p.name}${p.roleHint ? ` [${p.roleHint}]` : ""}`));
+    t.players.forEach((p) => console.log(`  ${p.name}${p.roleHint ? ` [${p.roleHint}]` : ""}${p.yahooPositions ? `  (${p.yahooPositions.join(",")})` : ""}${p.ilTag ? `  ${p.ilTag}` : ""}`));
   });
   process.exit(0);
 }
@@ -174,6 +191,9 @@ resolved.forEach((pl) => {
     reliefThisSeason: Math.max(0, (s.pitching?.games || 0) - (s.pitching?.gamesStarted || 0)),
     pitchedThisSeason: s.pitching?.games || 0,
   });
+  // The paste's own position list is Yahoo's actual current eligibility —
+  // authoritative when present; the stats computation is the fallback.
+  if (pl.yahooPositions && pl.yahooPositions.length) pl.positions = pl.yahooPositions;
   // Yahoo-style split entries become separate fantasy players ("{id}:B" /
   // "{id}:P"): the Batter half keeps hitter positions and scores only batting,
   // the Pitcher half keeps SP/RP and scores only pitching.
@@ -233,6 +253,7 @@ teams.forEach((t) => {
       mlbTeam: abbrOf[pl.mlb.currentTeam?.id] || "",
       primary: pl.mlb.primaryPosition?.abbreviation || "",
       positions: pl.positions, eligibleSlots: pl.slots,
+      basePositions: pl.positions, // season-start grant — never lost mid-year
       ilStatus: pl.ilTag || null, // from the Yahoo paste; the nightly MLB sync takes over
       rosteredBy: t.team.id, updatedAt: now,
     }, { merge: true });

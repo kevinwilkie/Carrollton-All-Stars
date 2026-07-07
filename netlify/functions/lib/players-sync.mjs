@@ -109,7 +109,9 @@ export async function syncPlayers(yesterday, season) {
 
   // ---- 3. recompute eligibility ----
   Object.values(updates).forEach((u) => {
-    u.positions = computePositions(u);
+    // Season-start eligibility (basePositions) is never lost mid-year; the
+    // stats-driven recompute only ADDS positions on top of it.
+    u.positions = [...new Set([...(u.basePositions || []), ...computePositions(u)])];
     if (u.twoWayRole === "B") {
       u.positions = u.positions.filter((p) => !["SP", "RP"].includes(p));
       if (!u.positions.length) u.positions = ["DH"];
