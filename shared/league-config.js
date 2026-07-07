@@ -24,27 +24,27 @@
   };
 
   // ---- The 12 teams ----------------------------------------------------------
-  // `email` is the Google account the owner signs in with. TODO(kevin): fill in
-  // the 11 missing emails — sign-in maps email → team, so an owner with a blank
-  // email can't manage their team yet. Keep these in sync with firestore.rules.
+  // `emails` = the Google account(s) the owner may sign in with (any of them
+  // maps to the team). TODO(kevin): fill in the 11 missing emails. Keep these
+  // in sync with firestore.rules.
   const LEAGUE_TEAMS = [
-    { id: "acuna-matata",   name: "Acuña Matata",                  owner: "Kevin Wilkie",    email: "kevin.wilkie@campusoutreach.org" },
-    { id: "rally-cats",     name: "Rally Cats",                    owner: "Katie Pollard",   email: "TODO-katie@example.com" },
-    { id: "speedster",      name: "kylespayde518's Speedster",     owner: "Kyle Spayde",     email: "TODO-kyle@example.com" },
-    { id: "jump",           name: "Might as well JUMP!",           owner: "Michael Bearden", email: "TODO-michael@example.com" },
-    { id: "hogans-heroes",  name: "Hogan's Heroes",                owner: "Ed Hogan",        email: "TODO-ed@example.com" },
-    { id: "witt-wisdom",    name: "Witt and Wisdom",               owner: "Anthony Amato",   email: "TODO-anthony@example.com" },
-    { id: "en-fuego",       name: "Coming En Fuego",               owner: "Curtis Gann",     email: "TODO-curtis@example.com" },
-    { id: "beer-snobs",     name: "Dream City Beer Snobs",         owner: "Joel Pollard",    email: "TODO-joel@example.com" },
-    { id: "ozzies-fish",    name: "Ozzie's Pet Fish",              owner: "Sam Pollard",     email: "TODO-sam@example.com" },
-    { id: "cousin-vinnie",  name: "My Cousin Vinnie",              owner: "Joe Ingui",       email: "TODO-joe@example.com" },
-    { id: "ace-dan",        name: "Ace Dan",                       owner: "Dan Moffitt",     email: "TODO-dan@example.com" },
-    { id: "baldwin-bro",    name: "Drake is the Best Baldwin Bro", owner: "Richie Valdes",   email: "TODO-richie@example.com" },
+    { id: "acuna-matata",   name: "Acuña Matata",                  owner: "Kevin Wilkie",    emails: ["kevin.wilkie@campusoutreach.org", "kevinwilkie92@gmail.com"] },
+    { id: "rally-cats",     name: "Rally Cats",                    owner: "Katie Pollard",   emails: ["TODO-katie@example.com"] },
+    { id: "speedster",      name: "kylespayde518's Speedster",     owner: "Kyle Spayde",     emails: ["TODO-kyle@example.com"] },
+    { id: "jump",           name: "Might as well JUMP!",           owner: "Michael Bearden", emails: ["TODO-michael@example.com"] },
+    { id: "hogans-heroes",  name: "Hogan's Heroes",                owner: "Ed Hogan",        emails: ["TODO-ed@example.com"] },
+    { id: "witt-wisdom",    name: "Witt and Wisdom",               owner: "Anthony Amato",   emails: ["TODO-anthony@example.com"] },
+    { id: "en-fuego",       name: "Coming En Fuego",               owner: "Curtis Gann",     emails: ["TODO-curtis@example.com"] },
+    { id: "beer-snobs",     name: "Dream City Beer Snobs",         owner: "Joel Pollard",    emails: ["TODO-joel@example.com"] },
+    { id: "ozzies-fish",    name: "Ozzie's Pet Fish",              owner: "Sam Pollard",     emails: ["TODO-sam@example.com"] },
+    { id: "cousin-vinnie",  name: "My Cousin Vinnie",              owner: "Joe Ingui",       emails: ["TODO-joe@example.com"] },
+    { id: "ace-dan",        name: "Ace Dan",                       owner: "Dan Moffitt",     emails: ["TODO-dan@example.com"] },
+    { id: "baldwin-bro",    name: "Drake is the Best Baldwin Bro", owner: "Richie Valdes",   emails: ["TODO-richie@example.com"] },
   ];
 
   // Commissioner Google account(s). Must match database.rules.json (RTDB) and
   // firestore.rules — all three gate on the same email(s).
-  const COMMISH_EMAILS = ["kevin.wilkie@campusoutreach.org"];
+  const COMMISH_EMAILS = ["kevin.wilkie@campusoutreach.org", "kevinwilkie92@gmail.com"];
 
   // ---- Draft -----------------------------------------------------------------
   const BUDGET = 300;        // auction dollars per team

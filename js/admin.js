@@ -72,7 +72,7 @@ async function adminSeed() {
     const batch = App.fs.batch();
     LEAGUE_TEAMS.forEach((t) => {
       batch.set(L().collection("teams").doc(t.id), {
-        name: t.name, owner: t.owner, ownerEmail: t.email,
+        name: t.name, owner: t.owner, ownerEmails: t.emails,
         faabRemaining: FAAB.budget,
       }, { merge: true });
     });

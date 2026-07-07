@@ -5,7 +5,7 @@
     "draft": {
       "$channel": {
         ".read": true,
-        ".write": "auth != null && auth.token.email_verified == true && auth.token.email == 'kevin.wilkie@campusoutreach.org'"
+        ".write": "auth != null && auth.token.email_verified == true && (auth.token.email == 'kevin.wilkie@campusoutreach.org' || auth.token.email == 'kevinwilkie92@gmail.com')"
       }
     }
   }

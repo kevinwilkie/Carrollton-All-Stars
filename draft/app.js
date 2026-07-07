@@ -1695,7 +1695,7 @@
         });
         batch.set(base.collection("rosters").doc(t.id), { players, updatedAt: now });
         batch.set(base.collection("teams").doc(t.id), {
-          name: t.name, owner: t.owner, ownerEmail: t.email,
+          name: t.name, owner: t.owner, ownerEmails: t.emails,
           faabRemaining: FAAB.budget,
           record: { w: 0, l: 0, t: 0, pf: 0, pa: 0 },
         }, { merge: true });

@@ -23,7 +23,8 @@ const Auth = {
 function authTeamFor(email) {
   if (!email) return null;
   const e = String(email).toLowerCase();
-  const t = LEAGUE_TEAMS.find((t) => String(t.email).toLowerCase() === e);
+  const t = LEAGUE_TEAMS.find((t) =>
+    (t.emails || []).some((x) => String(x).toLowerCase() === e));
   return t ? t.id : null;
 }
 function authIsCommish(email) {

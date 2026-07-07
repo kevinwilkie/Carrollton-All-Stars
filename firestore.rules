@@ -11,13 +11,17 @@ service cloud.firestore {
     function email() { return request.auth.token.email; }
     function signedIn() { return request.auth != null && request.auth.token.email_verified; }
     function isCommish() {
-      return signedIn() && email() == 'kevin.wilkie@campusoutreach.org';
+      return signedIn() && email() in [
+        'kevin.wilkie@campusoutreach.org',
+        'kevinwilkie92@gmail.com'
+      ];
     }
-    // TODO(kevin): replace placeholders with the real 12 owner emails
-    // (same list as shared/league-config.js LEAGUE_TEAMS).
+    // TODO(kevin): replace placeholders with the real owner emails
+    // (same lists as shared/league-config.js LEAGUE_TEAMS).
     function isOwner() {
       return signedIn() && email() in [
         'kevin.wilkie@campusoutreach.org',
+        'kevinwilkie92@gmail.com',
         'TODO-katie@example.com',
         'TODO-kyle@example.com',
         'TODO-michael@example.com',
@@ -33,7 +37,7 @@ service cloud.firestore {
     }
     function ownsTeam(teamId) {
       return signedIn() &&
-        get(/databases/$(database)/documents/leagues/carrollton/teams/$(teamId)).data.ownerEmail == email();
+        email() in get(/databases/$(database)/documents/leagues/carrollton/teams/$(teamId)).data.ownerEmails;
     }
 
     match /leagues/carrollton {
