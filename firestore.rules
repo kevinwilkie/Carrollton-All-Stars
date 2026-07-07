@@ -76,6 +76,12 @@ service cloud.firestore {
           (ownsTeam(resource.data.teamId) && resource.data.status == 'pending');
       }
 
+      // Keeper declarations: each owner saves their own list for next season.
+      // Doc id = {season}_{teamId}, e.g. 2028_acuna-matata.
+      match /keepers/{keeperId} {
+        allow write: if isCommish() || ownsTeam(keeperId.split('_')[1]);
+      }
+
       // Trades: proposer creates; the receiving team may accept/reject; any
       // uninvolved owner may flip ONLY their own veto flag; execution is
       // function-only (status stays whatever the timer decides).
