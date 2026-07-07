@@ -1,0 +1,175 @@
+/*
+ * MLB Stats API adapter — the ONLY module that touches statsapi.mlb.com.
+ * The API is free and unofficial; fields occasionally shift, so parsing here
+ * is defensive and raw payload subsets are preserved in Firestore statlines
+ * (points can be recomputed later if a parse bug is found).
+ */
+const BASE = "https://statsapi.mlb.com/api/v1";
+const BASE11 = "https://statsapi.mlb.com/api/v1.1";
+
+export async function fetchJson(url, tries = 3) {
+  let lastErr;
+  for (let i = 0; i < tries; i++) {
+    try {
+      const res = await fetch(url, { headers: { accept: "application/json" } });
+      if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
+      return await res.json();
+    } catch (e) {
+      lastErr = e;
+      await new Promise((r) => setTimeout(r, 400 * (i + 1)));
+    }
+  }
+  throw lastErr;
+}
+
+// ---- schedule ---------------------------------------------------------------
+// Games for one ET date: [{gamePk, status, firstPitchUTC, homeId, awayId, doubleHeader}]
+export async function scheduleForDate(dateISO) {
+  const d = await fetchJson(`${BASE}/schedule?sportId=1&date=${dateISO}`);
+  const days = d.dates || [];
+  const games = [];
+  days.forEach((day) => (day.games || []).forEach((g) => {
+    games.push({
+      gamePk: g.gamePk,
+      firstPitchUTC: g.gameDate,                       // ISO UTC
+      status: (g.status && g.status.abstractGameState) || "Preview", // Preview|Live|Final
+      detailedState: (g.status && g.status.detailedState) || "",
+      homeId: g.teams?.home?.team?.id,
+      awayId: g.teams?.away?.team?.id,
+      doubleHeader: g.doubleHeader || "N",
+    });
+  }));
+  return games;
+}
+
+export async function seasonInfo(season) {
+  const d = await fetchJson(`${BASE}/seasons/${season}?sportId=1`);
+  return (d.seasons || [])[0] || null;
+}
+
+// ---- boxscores → stat lines --------------------------------------------------
+export async function boxscore(gamePk) {
+  return fetchJson(`${BASE}/game/${gamePk}/boxscore`);
+}
+
+// Also grab the live-feed decisions (W/L/SV) as a backstop when the boxscore
+// pitching line lacks explicit win/save flags.
+export async function gameDecisions(gamePk) {
+  try {
+    const d = await fetchJson(`${BASE11}/game/${gamePk}/feed/live?fields=liveData,decisions,winner,loser,save,id`);
+    const dec = d?.liveData?.decisions || {};
+    return {
+      winner: dec.winner?.id || null,
+      save: dec.save?.id || null,
+    };
+  } catch (e) {
+    return { winner: null, save: null };
+  }
+}
+
+const num = (v) => (Number.isFinite(+v) ? +v : 0);
+
+// One game's boxscore → { [mlbId]: { name, teamId, batting, pitching, fieldPositions[] } }
+// batting/pitching keep exactly the fields shared/scoring.js consumes.
+export function extractStatLines(box, decisions = {}) {
+  const out = {};
+  ["home", "away"].forEach((side) => {
+    const team = box?.teams?.[side];
+    if (!team) return;
+    const teamId = team.team?.id;
+    Object.values(team.players || {}).forEach((pl) => {
+      const id = pl.person?.id;
+      if (!id) return;
+      const b = pl.stats?.batting;
+      const p = pl.stats?.pitching;
+      const line = { name: pl.person.fullName || "", teamId, fieldPositions: [] };
+
+      (pl.allPositions || []).forEach((pos) => {
+        if (pos && pos.abbreviation) line.fieldPositions.push(pos.abbreviation);
+      });
+
+      if (b && Object.keys(b).length && num(b.plateAppearances) + num(b.gamesPlayed) > 0) {
+        line.batting = {
+          hits: num(b.hits), doubles: num(b.doubles), triples: num(b.triples),
+          homeRuns: num(b.homeRuns), baseOnBalls: num(b.baseOnBalls),
+          intentionalWalks: num(b.intentionalWalks), runs: num(b.runs),
+          rbi: num(b.rbi), stolenBases: num(b.stolenBases), strikeOuts: num(b.strikeOuts),
+          plateAppearances: num(b.plateAppearances),
+        };
+      }
+      if (p && Object.keys(p).length && (num(p.outs) > 0 || p.inningsPitched || num(p.battersFaced) > 0)) {
+        line.pitching = {
+          outs: num(p.outs) || undefined,
+          inningsPitched: p.inningsPitched || "0.0",
+          strikeOuts: num(p.strikeOuts), hits: num(p.hits),
+          earnedRuns: num(p.earnedRuns), baseOnBalls: num(p.baseOnBalls),
+          gamesStarted: num(p.gamesStarted),
+          completeGames: num(p.completeGames), shutouts: num(p.shutouts),
+          // Per-game W/SV/HLD flags appear directly on modern boxscores;
+          // fall back to the live-feed decisions when missing.
+          wins: num(p.wins) || (decisions.winner === id ? 1 : 0),
+          saves: num(p.saves) || (decisions.save === id ? 1 : 0),
+          holds: num(p.holds),
+          battersFaced: num(p.battersFaced),
+        };
+      }
+      if (line.batting || line.pitching) out[id] = line;
+    });
+  });
+  return out;
+}
+
+// ---- teams & rosters ----------------------------------------------------------
+export async function allTeams(season) {
+  const d = await fetchJson(`${BASE}/teams?sportId=1&season=${season}`);
+  return d.teams || [];
+}
+
+// 40-man roster with player status (IL detection). Status codes starting with
+// "D" (D7/D10/D15/D60) are injured lists; "SU" suspended.
+export async function roster40(teamId, season) {
+  const d = await fetchJson(`${BASE}/teams/${teamId}/roster?rosterType=40Man&season=${season}`);
+  return (d.roster || []).map((r) => ({
+    mlbId: r.person?.id,
+    name: r.person?.fullName || "",
+    position: r.position?.abbreviation || "",
+    statusCode: r.status?.code || "A",
+    statusDescription: r.status?.description || "",
+  }));
+}
+
+export function ilStatusFromCode(code) {
+  if (!code) return null;
+  if (/^D/i.test(code)) return code.toUpperCase();      // D10/D15/D60 → on IL
+  return null;
+}
+
+// Season fielding/pitching splits for a batch of players (eligibility seeding).
+export async function seasonStats(personIds, season) {
+  const out = {};
+  for (let i = 0; i < personIds.length; i += 40) {
+    const ids = personIds.slice(i, i + 40).join(",");
+    const d = await fetchJson(
+      `${BASE}/people?personIds=${ids}&hydrate=stats(group=[fielding,pitching],type=[season],season=${season})`
+    );
+    (d.people || []).forEach((p) => {
+      const rec = { fielding: {}, pitching: null };
+      (p.stats || []).forEach((s) => {
+        const group = s.group?.displayName;
+        (s.splits || []).forEach((sp) => {
+          if (group === "fielding") {
+            const pos = sp.position?.abbreviation;
+            if (pos) rec.fielding[pos] = (rec.fielding[pos] || 0) + num(sp.stat?.games);
+          } else if (group === "pitching") {
+            rec.pitching = {
+              games: num(sp.stat?.gamesPlayed),
+              gamesStarted: num(sp.stat?.gamesStarted),
+            };
+          }
+        });
+      });
+      out[p.id] = { name: p.fullName, primary: p.primaryPosition?.abbreviation || "", ...rec };
+    });
+  }
+  return out;
+}

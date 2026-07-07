@@ -1,0 +1,9 @@
+{
+  "name": "carrollton-all-stars",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Carrollton All-Stars fantasy baseball league — static apps + Netlify scheduled functions",
+  "dependencies": {
+    "firebase-admin": "^12.7.0"
+  }
+}

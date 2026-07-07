@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Carrollton All-Stars — Auction Draft Board</title>
+  <link rel="preconnect" href="https://img.mlbstatic.com" />
+  <link rel="stylesheet" href="../shared/theme.css" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-badge">⚾</div>
+      <div class="brand-text">
+        <h1>Carrollton All-Stars</h1>
+        <span class="tagline">Auction Draft Board</span>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <span id="draft-summary" class="draft-summary"></span>
+      <select id="voice-select" class="voice-select" title="Announcement voice (this device only)" aria-label="Announcement voice"></select>
+      <button id="btn-publish" class="btn btn-small" hidden title="Copy the finished draft into the season app: rosters, prices, FAAB">📤 Publish to League</button>
+      <button id="btn-tv" class="btn btn-ghost" title="Bigger text + fullscreen for casting to a TV">📺 TV Mode</button>
+      <button id="btn-export" class="btn btn-ghost" title="Download a backup of the draft">Export</button>
+      <button id="btn-import" class="btn btn-ghost" title="Restore a saved draft">Import</button>
+      <button id="btn-reset" class="btn btn-danger-ghost" title="Clear the entire draft">Reset</button>
+      <input type="file" id="import-file" accept="application/json" hidden />
+    </div>
+  </header>
+
+  <nav class="tabs" id="tabs">
+    <button class="tab active" data-tab="board">Draft Board</button>
+    <button class="tab" data-tab="undrafted">Undrafted</button>
+    <button class="tab" data-tab="rosters">Rosters</button>
+    <button class="tab" data-tab="keepers">Keepers</button>
+    <button class="tab" data-tab="limits">Roster Needs</button>
+    <button class="tab" data-tab="log">Draft Log</button>
+    <button class="tab" data-tab="recap">Recap</button>
+  </nav>
+
+  <!-- On-the-block banner (shows for everyone while a player is nominated) -->
+  <div id="block-banner" class="block-banner" hidden></div>
+
+  <!-- ============ TAB: Draft Board ============ -->
+  <main class="layout view" id="view-board">
+    <!-- LEFT: the MLB club drawn from the hat & its players -->
+    <section class="panel panel-board">
+      <div class="board-header">
+        <div class="active-team-pick">
+          <label for="team-select">On the clock (drawn from the hat):</label>
+          <div class="team-controls">
+            <select id="team-select" aria-label="Active MLB club"></select>
+            <button id="btn-prev-team" class="btn btn-small" title="Previous club in order">‹</button>
+            <button id="btn-next-team" class="btn btn-small btn-primary" title="Next club in order">Next club ›</button>
+            <button id="btn-shuffle" class="btn btn-small" title="Reshuffle the draw order (the hat)">🎲 Shuffle</button>
+          </div>
+        </div>
+        <div class="active-team-meta">
+          <img id="active-team-logo" class="active-team-logo" alt="" />
+          <span id="active-team-name" class="active-team-name"></span>
+          <span id="active-team-progress" class="pill"></span>
+        </div>
+        <input type="search" id="player-search" class="player-search"
+               placeholder="Filter players on this club…" />
+      </div>
+      <div id="player-board" class="player-board"><!-- position groups injected --></div>
+    </section>
+
+    <!-- RIGHT: Managers -->
+    <aside class="panel panel-managers">
+      <h2>Managers</h2>
+      <table class="managers-table">
+        <thead>
+          <tr>
+            <th class="ta-left">Team</th>
+            <th title="Budget remaining">Budget</th>
+            <th title="Most you can bid and still fill your roster at $1/spot">Max</th>
+            <th title="Roster spots remaining">Spots</th>
+          </tr>
+        </thead>
+        <tbody id="managers-body"></tbody>
+      </table>
+      <p class="hint">Click a team to view its roster. Max bid reserves $1 for each empty roster spot.</p>
+    </aside>
+  </main>
+
+  <!-- ============ TAB: Undrafted ============ -->
+  <section class="panel view" id="view-undrafted" hidden>
+    <div class="view-head">
+      <h2>Undrafted Players</h2>
+      <input type="search" id="undrafted-search" class="player-search" placeholder="Search undrafted players…" />
+    </div>
+    <div id="undrafted-board" class="undrafted-board"></div>
+  </section>
+
+  <!-- ============ TAB: Rosters ============ -->
+  <section class="panel view" id="view-rosters" hidden>
+    <div class="rosters-scroll scroll-x">
+      <table class="rosters-grid" id="rosters-grid"></table>
+    </div>
+    <p class="hint">Slots fill automatically (exact position → INF/UTIL → bench). It's a display aid — real lineups are set daily in the season app.</p>
+  </section>
+
+  <!-- ============ TAB: Keepers ============ -->
+  <section class="panel view" id="view-keepers" hidden>
+    <div class="view-head">
+      <h2>Keepers</h2>
+      <div class="keepers-head-actions">
+        <button id="btn-clear-keepers" class="btn btn-danger-ghost" title="Remove every keeper and return them to the draft pool">Clear all keepers</button>
+      </div>
+    </div>
+    <p class="hint">Each team may keep up to <b>5</b> players. A keeper is assigned to that team, costs come out of its $300 budget, and fills a roster slot. <b>Year 1</b> cost = last year's price + $5 (flat <b>$5</b> if undrafted). <b>Year 2</b> cost = ESPN AVG SALARY (rounded). No player may be kept a third straight year.</p>
+    <p id="prior-status" class="prior-status" hidden></p>
+    <div id="keepers-grid" class="keepers-grid"></div>
+    <div id="keeper-eligibility" class="keeper-eligibility-card"></div>
+  </section>
+
+  <!-- ============ TAB: Roster Needs ============ -->
+  <section class="panel view" id="view-limits" hidden>
+    <h2>Roster Needs</h2>
+    <div class="limits-scroll scroll-x">
+      <table class="limits-grid" id="limits-grid"></table>
+    </div>
+    <p class="hint">Open slots by type for each team. <span class="limit-full">Red</span> = that team can no longer legally add a player of that position (all fitting slots are spoken for).</p>
+  </section>
+
+  <!-- ============ TAB: Draft Log ============ -->
+  <section class="panel view" id="view-log" hidden>
+    <h2>Draft Log</h2>
+    <div id="log-board" class="log-board"></div>
+  </section>
+
+  <!-- ============ TAB: Recap ============ -->
+  <section class="panel view" id="view-recap" hidden>
+    <div class="view-head">
+      <h2>Draft Recap</h2>
+      <button id="btn-print-results" class="btn" title="Open a clean printable page (use your browser's Save as PDF to share)">🖨️ Print / Share Results</button>
+    </div>
+    <div id="recap-board" class="recap-board"></div>
+  </section>
+
+  <!-- ============ Auction modal ============ -->
+  <div id="auction-modal" class="modal-overlay" hidden>
+    <div class="modal">
+      <div class="sheet-grab"></div>
+      <h2>Assign Player</h2>
+      <div id="auction-player" class="auction-player"></div>
+      <form id="auction-form">
+        <label for="auction-manager">Winning team</label>
+        <select id="auction-manager"></select>
+
+        <label for="auction-bid">Winning bid ($)</label>
+        <input type="number" id="auction-bid" min="1" step="1" value="1" required />
+        <p id="auction-error" class="auction-error" hidden></p>
+
+        <div class="modal-actions">
+          <button type="button" id="auction-cancel" class="btn btn-ghost">Cancel</button>
+          <button type="submit" class="btn btn-primary">Confirm pick</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============ Keeper modal ============ -->
+  <div id="keeper-modal" class="modal-overlay" hidden>
+    <div class="modal">
+      <div class="sheet-grab"></div>
+      <h2>Add Keeper</h2>
+      <form id="keeper-form">
+        <label for="keeper-manager">Team keeping the player</label>
+        <select id="keeper-manager"></select>
+
+        <div id="keeper-pool">
+          <label for="keeper-search">Player</label>
+          <input type="search" id="keeper-search" placeholder="Search players…" autocomplete="off" />
+          <select id="keeper-player" size="6"></select>
+        </div>
+
+        <label class="keeper-custom-line">
+          <input type="checkbox" id="keeper-custom-toggle" />
+          Player not listed — add manually
+        </label>
+        <div id="keeper-custom" hidden>
+          <input type="text" id="keeper-custom-name" placeholder="Player name" autocomplete="off" />
+          <div class="keeper-custom-row">
+            <select id="keeper-custom-team"></select>
+            <select id="keeper-custom-pos"></select>
+          </div>
+        </div>
+
+        <label>Keeper year</label>
+        <div class="keeper-year-row">
+          <label class="keeper-radio"><input type="radio" name="keeper-year" value="1" checked /> Year 1 <span class="kr-note">(last year + $5)</span></label>
+          <label class="keeper-radio"><input type="radio" name="keeper-year" value="2" /> Year 2 <span class="kr-note">(ESPN avg · final year)</span></label>
+        </div>
+
+        <div id="keeper-cost-y1">
+          <label class="keeper-undrafted-line">
+            <input type="checkbox" id="keeper-undrafted" />
+            Wasn't drafted last year (waiver / free-agent pickup → flat $5)
+          </label>
+          <div id="keeper-prior-row">
+            <label for="keeper-prior">Last year's draft cost ($)</label>
+            <input type="number" id="keeper-prior" min="0" step="1" placeholder="e.g. 27" />
+          </div>
+        </div>
+        <div id="keeper-cost-y2" hidden>
+          <label for="keeper-espn">ESPN AVG SALARY ($)</label>
+          <input type="number" id="keeper-espn" min="0" step="0.1" placeholder="e.g. 41.6" />
+          <p id="keeper-espn-note" class="keeper-espn-note" hidden></p>
+          <p class="keeper-espn-hint">Auto-filled from <a href="https://fantasy.espn.com/baseball/livedraftresults" target="_blank" rel="noopener">ESPN live draft trends</a> — live until the keeper deadline, then locked. The app rounds it (.5↑ / .4↓); you can override.</p>
+        </div>
+
+        <p id="keeper-suggestion" class="keeper-suggestion" hidden></p>
+        <p id="keeper-computed" class="keeper-computed"></p>
+        <p id="keeper-error" class="auction-error" hidden></p>
+
+        <div class="modal-actions">
+          <button type="button" id="keeper-cancel" class="btn btn-ghost">Cancel</button>
+          <button type="submit" class="btn btn-primary">Add keeper</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============ Roster modal ============ -->
+  <div id="roster-modal" class="modal-overlay" hidden>
+    <div class="modal modal-wide">
+      <div class="sheet-grab"></div>
+      <div class="roster-header">
+        <h2 id="roster-title"></h2>
+        <button type="button" id="roster-close" class="btn btn-ghost">Close</button>
+      </div>
+      <div id="roster-summary" class="roster-summary"></div>
+      <table class="roster-table">
+        <thead>
+          <tr><th>Slot</th><th class="ta-left">Player</th><th>Pos</th><th>Club</th><th>Bid</th><th></th></tr>
+        </thead>
+        <tbody id="roster-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ============ Draft-complete celebration ============ -->
+  <div id="celebrate" class="celebrate-overlay" hidden>
+    <div class="celebrate-confetti" id="celebrate-confetti"></div>
+    <div class="celebrate-card">
+      <div class="celebrate-trophy">🏆</div>
+      <h2>Draft Complete!</h2>
+      <p>Every roster is full — play ball, Carrollton All-Stars!</p>
+      <div class="celebrate-actions">
+        <button id="celebrate-recap" class="btn btn-primary">View Recap</button>
+        <button id="celebrate-print" class="btn">🖨️ Print / Share Results</button>
+        <button id="celebrate-close" class="btn btn-ghost">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" hidden></div>
+  <div id="sold-flash" class="sold-flash" hidden></div>
+
+  <!-- Firebase SDK (compat build = no module/build step). Loads only when
+       online; the app falls back to local-only mode if these don't load. -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+
+  <!-- Shared league config + helpers, then draft data, then the app -->
+  <script src="../shared/league-config.js"></script>
+  <script src="../shared/util.js"></script>
+  <script src="../shared/firebase-init.js"></script>
+  <script src="data/mlb-teams.js"></script>
+  <script src="data/draft-config.js"></script>
+  <script src="data/players.js"></script>
+  <script src="data/prior-season.js"></script>
+  <script src="data/voice-config.js"></script>
+  <script src="feasibility.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

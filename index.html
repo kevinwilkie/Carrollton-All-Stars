@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Carrollton All-Stars — Fantasy Baseball</title>
+  <link rel="preconnect" href="https://img.mlbstatic.com" />
+  <link rel="stylesheet" href="shared/theme.css" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-badge">⚾</div>
+      <div class="brand-text">
+        <h1>Carrollton All-Stars</h1>
+        <span class="tagline">Fantasy Baseball</span>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <span id="week-pill" class="pill" hidden></span>
+      <span id="faab-pill" class="pill" hidden title="FAAB budget remaining"></span>
+      <a class="btn btn-ghost" href="draft/" title="The live auction draft board">🧢 Draft Board</a>
+      <span id="role-badge" class="role-badge" hidden></span>
+      <button id="btn-auth" class="btn">Sign in</button>
+    </div>
+  </header>
+
+  <nav class="tabs" id="tabs">
+    <button class="tab active" data-tab="myteam">My Team</button>
+    <button class="tab" data-tab="matchup">Matchup</button>
+    <button class="tab" data-tab="scoreboard">Scoreboard</button>
+    <button class="tab" data-tab="standings">Standings</button>
+    <button class="tab" data-tab="players">Players</button>
+    <button class="tab" data-tab="trades">Trades</button>
+    <button class="tab" data-tab="transactions">Transactions</button>
+    <button class="tab" data-tab="schedule">Schedule</button>
+    <button class="tab" data-tab="keepers">Keepers</button>
+    <button class="tab" data-tab="admin" id="tab-admin" hidden>Admin</button>
+  </nav>
+
+  <main id="content">
+    <section class="view" id="view-myteam"></section>
+    <section class="view" id="view-matchup" hidden></section>
+    <section class="view" id="view-scoreboard" hidden></section>
+    <section class="view" id="view-standings" hidden></section>
+    <section class="view" id="view-players" hidden></section>
+    <section class="view" id="view-trades" hidden></section>
+    <section class="view" id="view-transactions" hidden></section>
+    <section class="view" id="view-schedule" hidden></section>
+    <section class="view" id="view-keepers" hidden></section>
+    <section class="view" id="view-admin" hidden></section>
+  </main>
+
+  <!-- Sign-in gate (Frankford pattern): shown until a league account resolves -->
+  <div id="gate" class="gate" hidden>
+    <div class="gate-card">
+      <div class="brand-badge">⚾</div>
+      <h2>Carrollton All-Stars</h2>
+      <p id="gate-msg">Sign in with the Google account your team is registered under.</p>
+      <button id="gate-signin" class="btn">Sign in with Google</button>
+      <button id="gate-signout" class="btn btn-ghost" hidden>Use a different account</button>
+    </div>
+  </div>
+
+  <!-- FAAB claim modal -->
+  <div id="claim-modal" class="modal-overlay" hidden>
+    <div class="modal">
+      <div class="sheet-grab"></div>
+      <h2>Waiver Claim</h2>
+      <div id="claim-player" class="claim-player"></div>
+      <form id="claim-form">
+        <label for="claim-bid">FAAB bid ($1 minimum)</label>
+        <input type="number" id="claim-bid" min="1" step="1" value="1" required />
+        <label for="claim-drop">Drop (required when your roster is full)</label>
+        <select id="claim-drop"><option value="">— no drop —</option></select>
+        <p class="hint" id="claim-hint"></p>
+        <p id="claim-error" class="form-error" hidden></p>
+        <div class="modal-actions">
+          <button type="button" id="claim-cancel" class="btn btn-ghost">Cancel</button>
+          <button type="submit" class="btn btn-primary">Place claim</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Trade proposal modal -->
+  <div id="trade-modal" class="modal-overlay" hidden>
+    <div class="modal modal-wide">
+      <div class="sheet-grab"></div>
+      <h2>Propose Trade</h2>
+      <form id="trade-form">
+        <label for="trade-partner">Trade with</label>
+        <select id="trade-partner"></select>
+        <div class="trade-cols">
+          <div>
+            <div class="eyebrow">You send</div>
+            <div id="trade-gives" class="trade-list"></div>
+          </div>
+          <div>
+            <div class="eyebrow">You receive</div>
+            <div id="trade-gets" class="trade-list"></div>
+          </div>
+        </div>
+        <p id="trade-error" class="form-error" hidden></p>
+        <div class="modal-actions">
+          <button type="button" id="trade-cancel" class="btn btn-ghost">Cancel</button>
+          <button type="submit" class="btn btn-primary">Send proposal</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <!-- Firebase compat SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+  <!-- Shared config/helpers, then the app modules (order matters) -->
+  <script src="shared/league-config.js"></script>
+  <script src="shared/util.js"></script>
+  <script src="shared/scoring.js"></script>
+  <script src="shared/firebase-init.js"></script>
+  <script src="shared/auth.js"></script>
+  <script src="shared/schedule-gen.js"></script>
+  <script src="draft/feasibility.js"></script>
+  <script src="js/state.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/lineups.js"></script>
+  <script src="js/matchup.js"></script>
+  <script src="js/scoreboard.js"></script>
+  <script src="js/standings.js"></script>
+  <script src="js/players.js"></script>
+  <script src="js/trades.js"></script>
+  <script src="js/transactions.js"></script>
+  <script src="js/schedule.js"></script>
+  <script src="js/keepers.js"></script>
+  <script src="js/admin.js"></script>
+  <script src="js/render.js"></script>
+</body>
+</html>

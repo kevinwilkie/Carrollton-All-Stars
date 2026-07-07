@@ -1,0 +1,31 @@
+# Carrollton All-Stars — Netlify configuration
+#
+# The site is plain static files (no build step). The season app lives at /,
+# the draft board at /draft/. Scheduled functions keep stats, waivers, and
+# trades moving; they need the env vars described in SETUP.md
+# (FIREBASE_SERVICE_ACCOUNT_B64, FIREBASE_DB_URL).
+
+[build]
+  publish = "."
+  command = ""
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
+# Pull MLB box scores + refresh live scoring, and snapshot lineup locks as
+# games start. Runs every 30 minutes; exits immediately when no games are
+# scheduled (off-season / overnight), so the invocation budget stays tiny.
+[functions."ingest-stats"]
+  schedule = "*/30 * * * *"
+
+# Nightly rollover at 08:10 UTC = 3:10am EST / 4:10am EDT — before any game:
+# finalize yesterday, settle finished weeks, process FAAB waivers, sync player
+# eligibility + IL status, write today's game/lock times.
+[functions."daily-rollover"]
+  schedule = "10 8 * * *"
+
+# Hourly: execute trades whose 1-day review has passed without 6 vetoes,
+# expire stale claims, and flag roster irregularities for the commissioner.
+[functions."hourly-tick"]
+  schedule = "5 * * * *"

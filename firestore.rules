@@ -1,0 +1,102 @@
+rules_version = '2';
+
+// Carrollton All-Stars — Firestore security rules.
+// Owners read everything and write only their own lineup / claims / trades /
+// votes. All money-moving and scoring writes happen in the Netlify functions
+// (Admin SDK bypasses these rules). Keep the email lists in sync with
+// shared/league-config.js.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function email() { return request.auth.token.email; }
+    function signedIn() { return request.auth != null && request.auth.token.email_verified; }
+    function isCommish() {
+      return signedIn() && email() == 'kevin.wilkie@campusoutreach.org';
+    }
+    // TODO(kevin): replace placeholders with the real 12 owner emails
+    // (same list as shared/league-config.js LEAGUE_TEAMS).
+    function isOwner() {
+      return signedIn() && email() in [
+        'kevin.wilkie@campusoutreach.org',
+        'TODO-katie@example.com',
+        'TODO-kyle@example.com',
+        'TODO-michael@example.com',
+        'TODO-ed@example.com',
+        'TODO-anthony@example.com',
+        'TODO-curtis@example.com',
+        'TODO-joel@example.com',
+        'TODO-sam@example.com',
+        'TODO-joe@example.com',
+        'TODO-dan@example.com',
+        'TODO-richie@example.com'
+      ];
+    }
+    function ownsTeam(teamId) {
+      return signedIn() &&
+        get(/databases/$(database)/documents/leagues/carrollton/teams/$(teamId)).data.ownerEmail == email();
+    }
+
+    match /leagues/carrollton {
+
+      // Default: league members read, nobody writes (functions bypass rules).
+      match /{document=**} {
+        allow read: if isOwner();
+        allow write: if false;
+      }
+
+      // Commissioner can hand-fix anything from the Admin tab.
+      match /{collection}/{doc} {
+        allow write: if isCommish();
+      }
+
+      // Daily lineup: only your own, and never touching the `locked` map the
+      // functions maintain. Doc id = {teamId}_{YYYY-MM-DD}.
+      match /lineups/{lineupId} {
+        allow create: if isCommish() ||
+          (ownsTeam(lineupId.split('_')[0]) &&
+           !('locked' in request.resource.data));
+        allow update: if isCommish() ||
+          (ownsTeam(lineupId.split('_')[0]) &&
+           request.resource.data.get('locked', {}) == resource.data.get('locked', {}));
+      }
+
+      // FAAB claims: create your own pending claim (bid ≥ $1), cancel it while
+      // pending. Resolution is function-only.
+      match /claims/{claimId} {
+        allow create: if isCommish() ||
+          (ownsTeam(request.resource.data.teamId) &&
+           request.resource.data.status == 'pending' &&
+           request.resource.data.bid is int &&
+           request.resource.data.bid >= 1);
+        allow delete: if isCommish() ||
+          (ownsTeam(resource.data.teamId) && resource.data.status == 'pending');
+      }
+
+      // Trades: proposer creates; the receiving team may accept/reject; any
+      // uninvolved owner may flip ONLY their own veto flag; execution is
+      // function-only (status stays whatever the timer decides).
+      match /trades/{tradeId} {
+        allow create: if isCommish() ||
+          (ownsTeam(request.resource.data.from) &&
+           request.resource.data.status == 'proposed');
+        allow update: if isCommish() || (
+          isOwner() && (
+            // recipient accepting or rejecting the proposal
+            (ownsTeam(resource.data.to) &&
+             resource.data.status == 'proposed' &&
+             request.resource.data.status in ['accepted', 'rejected'] &&
+             request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'reviewEndsAt', 'respondedAt'])) ||
+            // proposer withdrawing
+            (ownsTeam(resource.data.from) &&
+             resource.data.status == 'proposed' &&
+             request.resource.data.status == 'withdrawn' &&
+             request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])) ||
+            // an uninvolved owner toggling their own veto during review
+            (resource.data.status == 'accepted' &&
+             request.resource.data.diff(resource.data).affectedKeys().hasOnly(['vetoes']))
+          )
+        );
+      }
+    }
+  }
+}
