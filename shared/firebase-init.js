@@ -8,18 +8,15 @@
  * These values are PUBLIC by design (they ship to every browser) — security
  * comes from the database rules + Google sign-in, never from hiding keys.
  */
-const FIREBASE_CONFIG = null;
-/* Example:
 const FIREBASE_CONFIG = {
-  apiKey: "AIza...",
-  authDomain: "carrollton-allstars.firebaseapp.com",
-  databaseURL: "https://carrollton-allstars-default-rtdb.firebaseio.com",
-  projectId: "carrollton-allstars",
-  storageBucket: "carrollton-allstars.firebasestorage.app",
-  messagingSenderId: "…",
-  appId: "…",
+  apiKey: "AIzaSyAjcFDbjg9nbHoUhS3DF_dE5UXfkPgbMKU",
+  authDomain: "carrollton-all-stars.firebaseapp.com",
+  databaseURL: "https://carrollton-all-stars-default-rtdb.firebaseio.com",
+  projectId: "carrollton-all-stars",
+  storageBucket: "carrollton-all-stars.firebasestorage.app",
+  messagingSenderId: "140901323118",
+  appId: "1:140901323118:web:39f3908644d322841e717f",
 };
-*/
 
 // Initialize the compat SDK once per page. Returns null when Firebase isn't
 // configured or the CDN scripts didn't load (offline) — callers fall back to
