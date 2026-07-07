@@ -1,14 +1,35 @@
 /*
- * My Team tab — the daily lineup editor.
- * Tap a player, then tap a highlighted destination slot to swap. Players lock
- * at their game's first pitch (the ingest job snapshots locks; the UI also
- * treats any started game as locked so the two never disagree in your favor).
+ * My Team tab — the daily lineup editor (Yahoo/Sleeper style).
+ *   • Tap a position chip → pick any eligible player for that spot (the one
+ *     it replaces swaps positions if it fits, otherwise drops to the bench).
+ *   • Tap a bench player's chip → pick which lineup slot to move him into.
+ *   • Tap a player → a card with his info, stats, eligibility and status.
+ * Players lock at their game's first pitch (the ingest job snapshots locks;
+ * the UI also treats any started game as locked so the two never disagree).
  */
 "use strict";
 
 let luRoster = null;       // my roster doc
 let luScore = null;        // my score doc for the viewed week
 let luLoading = false;
+
+const ACTIVE_KEYS = SLOT_KEYS.filter(isActiveSlot);
+const IL_KEYS = SLOT_KEYS.filter((k) => slotType(k) === "IL");
+const HITTER_SLOT_TYPES = ["C", "1B", "2B", "3B", "SS", "INF", "OF", "UTIL"];
+function isHitterSlot(k) { return HITTER_SLOT_TYPES.includes(slotType(k)); }
+// A player belongs on the pitcher side only if every eligible position is SP/RP.
+function isPitcherPlayer(p) {
+  const pos = (p && p.positions) || [];
+  return pos.length > 0 && pos.every((x) => x === "SP" || x === "RP");
+}
+
+// Friendly names for slot pickers.
+const SLOT_LABEL = {
+  C: "Catcher", "1B": "First Base", "2B": "Second Base", "3B": "Third Base",
+  SS: "Shortstop", INF: "Infield (CI/MI)", OF: "Outfield", UTIL: "Utility",
+  SP: "Starting Pitcher", RP: "Relief Pitcher", IL: "Injured List",
+};
+function slotLabel(k) { return SLOT_LABEL[slotType(k)] || slotType(k); }
 
 async function ensureMyTeamData() {
   if (luLoading || !App.myTeamId || !App.fs) return;
@@ -24,21 +45,47 @@ async function ensureMyTeamData() {
   renderActive();
 }
 
-function lineupSlotsForView() {
-  // Prefer the live doc; otherwise build a preview from the roster (first
-  // edit writes it). Past dates without a doc just show empty.
-  if (App.lineup && App.lineup.slots) return { ...App.lineup.slots };
-  if (!luRoster) return null;
-  const players = Object.values(luRoster.players || {}).map((p) => ({
-    mlbId: p.mlbId, positions: p.positions || [],
-  }));
-  const slots = Object.fromEntries(SLOT_KEYS.map((k) => [k, null]));
-  const draftKeys = SLOT_KEYS.filter((k) => slotType(k) !== "IL");
+function rosterIds() {
+  return luRoster ? Object.keys(luRoster.players || {}) : [];
+}
+
+// The current lineup as { active:{slotKey:id|null}, il:{ilKey:id|null} }.
+// Bench is everything on the roster not sitting in one of those slots, so it
+// grows past six whenever a starting slot is left open.
+function currentAssignment() {
+  const active = Object.fromEntries(ACTIVE_KEYS.map((k) => [k, null]));
+  const il = Object.fromEntries(IL_KEYS.map((k) => [k, null]));
+  const roster = new Set(rosterIds());
+  const saved = App.lineup && App.lineup.slots;
+  if (saved) {
+    ACTIVE_KEYS.forEach((k) => { const v = saved[k] && String(saved[k]); if (v && roster.has(v)) active[k] = v; });
+    IL_KEYS.forEach((k) => { const v = saved[k] && String(saved[k]); if (v && roster.has(v)) il[k] = v; });
+    return { active, il };
+  }
+  if (!luRoster) return { active, il };
+  // No saved doc yet: seed a legal lineup from the roster via the matcher.
+  const players = rosterIds().map((id) => ({ mlbId: id, positions: metaOf(id).positions || [] }));
+  const nonIL = SLOT_KEYS.filter((k) => slotType(k) !== "IL");
   const { cells, overflow } = Feasibility.assignSlots(players);
-  cells.forEach((c, i) => { if (c.player) slots[draftKeys[i]] = c.player.mlbId; });
-  const ilKeys = SLOT_KEYS.filter((k) => slotType(k) === "IL");
-  overflow.forEach((p, i) => { if (ilKeys[i]) slots[ilKeys[i]] = p.mlbId; });
-  return slots;
+  cells.forEach((c, i) => { const k = nonIL[i]; if (c.player && isActiveSlot(k)) active[k] = String(c.player.mlbId); });
+  overflow.forEach((p, i) => { if (IL_KEYS[i]) il[IL_KEYS[i]] = String(p.mlbId); });
+  return { active, il };
+}
+
+function benchIds(active, il) {
+  const seated = new Set([...Object.values(active), ...Object.values(il)].filter(Boolean));
+  return rosterIds().filter((id) => !seated.has(id));
+}
+
+// Persist active+IL; bench players trail under sequential BN keys (which may
+// exceed six — the scoring job only ever reads the active slots).
+async function persistAssignment(active, il) {
+  const slots = {};
+  ACTIVE_KEYS.forEach((k) => { slots[k] = active[k] || null; });
+  IL_KEYS.forEach((k) => { slots[k] = il[k] || null; });
+  benchIds(active, il).forEach((id, i) => { slots[`BN${i + 1}`] = id; });
+  App.lineup = { ...(App.lineup || { teamId: App.myTeamId, date: App.date }), slots };  // optimistic
+  await saveLineupSlots(slots);
 }
 
 function gameFor(player) {
@@ -94,33 +141,86 @@ function myRank() {
   return i < 0 ? null : `${ordinal(i + 1)} of ${ids.length}`;
 }
 
-// Yahoo's "Start Active Players": pull bench players with a game today into
-// empty active slots, then swap them in for starters who aren't playing.
-// Locked players never move; every swap is validated both directions.
-function startActivePlayers(slots) {
-  const next = { ...slots };
-  const active = SLOT_KEYS.filter(isActiveSlot);
-  const benchKeys = SLOT_KEYS.filter((k) => slotType(k) === "BN");
+// ---- moving players around --------------------------------------------------
+// The single primitive: put `playerId` into `targetSlot`, displacing whoever's
+// there. If the mover came from another slot and the displaced player fits that
+// slot, they swap; otherwise the displaced player drops to the bench. Locked
+// players (game started) never move. Returns "" on success or an error string.
+function tryMove(active, il, playerId, targetSlot) {
+  const map = { ...active, ...il };
+  const setSlot = (k, v) => { if (IL_KEYS.includes(k)) il[k] = v; else active[k] = v; };
+  const p = playerOf(playerId) || metaOf(playerId);
+  const occupant = map[targetSlot] || null;
+  if (!playerFitsSlotKey(p, targetSlot))
+    return `${metaOf(playerId).name} can't fill ${slotLabel(targetSlot)}${slotType(targetSlot) === "IL" ? " (not on an MLB IL)" : ""}.`;
+  if (isLockedNow(playerId, playerOf(playerId)))
+    return `${metaOf(playerId).name} is locked.`;
+  if (occupant && isLockedNow(occupant, playerOf(occupant)))
+    return `${metaOf(occupant).name} is locked.`;
+  const fromSlot = Object.keys(map).find((k) => map[k] === playerId) || null;
+  setSlot(targetSlot, playerId);
+  if (fromSlot && fromSlot !== targetSlot) {
+    if (occupant && playerFitsSlotKey(playerOf(occupant) || metaOf(occupant), fromSlot)) setSlot(fromSlot, occupant);
+    else setSlot(fromSlot, null);   // occupant → bench
+  }
+  return "";
+}
+
+async function moveIntoSlot(playerId, targetSlot) {
+  if (App.date < etDate()) return;
+  const { active, il } = currentAssignment();
+  const err = tryMove(active, il, playerId, targetSlot);
+  if (err) return toast(err, "error");
+  await saveAndToast(active, il);
+}
+
+async function benchPlayer(playerId) {
+  if (App.date < etDate()) return;
+  const { active, il } = currentAssignment();
+  const slot = Object.keys({ ...active, ...il }).find((k) => (active[k] || il[k]) === playerId);
+  if (!slot) return;
+  if (isLockedNow(playerId, playerOf(playerId))) return toast(`${metaOf(playerId).name} is locked.`, "error");
+  if (IL_KEYS.includes(slot)) il[slot] = null; else active[slot] = null;
+  await saveAndToast(active, il);
+}
+
+async function saveAndToast(active, il) {
+  try {
+    await persistAssignment(active, il);
+    toast("Lineup saved.", "success");
+  } catch (e) {
+    toast("Couldn't save lineup: " + (e.message || "permission denied"), "error");
+  }
+  closeSheet();
+  renderActive();
+}
+
+// "Start Active Players": fill open active slots with benched players who have
+// a game today, then bench any starter with no game in favor of one who plays.
+async function startActivePlayers() {
+  if (App.date < etDate()) return;
+  const { active, il } = currentAssignment();
   const hasGame = (id) => !!gameFor(playerOf(id));
   const movable = (id) => id && playerOf(id) && !isLockedNow(id, playerOf(id));
-  let moves = 0;
-  benchKeys.forEach((bk) => {
-    const bid = next[bk];
-    if (!movable(bid) || !hasGame(bid)) return;
-    const bp = playerOf(bid);
-    let target = active.find((ak) => !next[ak] && playerFitsSlotKey(bp, ak));
-    if (!target) target = active.find((ak) => {
-      const oid = next[ak];
-      return movable(oid) && !hasGame(oid) && playerFitsSlotKey(bp, ak);
-    });
-    if (target) {
-      const oid = next[target] || null;
-      next[target] = bid;
-      next[bk] = oid;
-      moves++;
+  let moves = 0, changed = true;
+  while (changed) {
+    changed = false;
+    for (const bid of benchIds(active, il)) {
+      if (!movable(bid) || !hasGame(bid)) continue;
+      const bp = playerOf(bid);
+      let target = ACTIVE_KEYS.find((k) => !active[k] && playerFitsSlotKey(bp, k));
+      if (!target) target = ACTIVE_KEYS.find((k) => movable(active[k]) && !hasGame(active[k]) && playerFitsSlotKey(bp, k));
+      if (target) { if (!tryMove(active, il, bid, target)) { moves++; changed = true; break; } }
     }
-  });
-  return { next, moves };
+  }
+  if (!moves) return toast("Everyone with a game today is already starting.", "success");
+  try {
+    await persistAssignment(active, il);
+    toast(`Moved ${moves} player${moves > 1 ? "s" : ""} into the lineup.`, "success");
+  } catch (e) {
+    toast("Couldn't save lineup: " + (e.message || "permission denied"), "error");
+  }
+  renderActive();
 }
 
 function renderMyTeam() {
@@ -131,42 +231,31 @@ function renderMyTeam() {
     `Ask the commissioner to add your email to the league config.</p></div>`;
   if (!App.players || !luRoster) { ensureMyTeamData(); return host.innerHTML = `<div class="empty-note">Loading roster…</div>`; }
 
-  const slots = lineupSlotsForView();
+  const { active, il } = currentAssignment();
   const today = etDate();
   const wk = weekFor(App.date);
+  const editable = App.date >= today;
 
   const dayPts = (luScore && luScore.byPlayerDays && luScore.byPlayerDays[App.date]) || {};
   const dayTotal = (luScore && luScore.byDay && luScore.byDay[App.date]) ?? null;
+  const ptsOf = (id) => (dayPts[String(id)] ? dayPts[String(id)].points : null);
 
-  const rowFor = (slotKey) => {
-    const id = slots ? slots[slotKey] : null;
-    const t = slotType(slotKey);
-    const cls = t === "BN" ? " bench" : t === "IL" ? " il" : "";
-    const selCls = App.selectedSlot === slotKey ? " selected" : "";
-    let droppable = "";
-    if (App.selectedSlot && App.selectedSlot !== slotKey) {
-      const moving = metaOf(slots[App.selectedSlot]);
-      const occupant = id ? metaOf(id) : null;
-      const fromType = slotType(App.selectedSlot);
-      if (slots[App.selectedSlot] && playerFitsSlotKey(playerOf(slots[App.selectedSlot]) || moving, slotKey) &&
-          (!occupant || playerFitsSlotKey(playerOf(id) || occupant, fromType === "IL" ? "IL1" : App.selectedSlot)) &&
-          (!id || !isLockedNow(id, playerOf(id))) ) {
-        droppable = " droppable";
-      }
-    }
-    const chip = `<span class="slot-chip chip-${t}">${t}</span>`;
-    if (!id) {
-      return `<div class="lu-row${cls}${selCls}${droppable}" data-slot="${slotKey}">` +
-        `${chip}<span class="lu-empty">Empty</span></div>`;
-    }
+  // A filled row. `chipType` drives the chip: the slot type for a lineup slot,
+  // or the player's lead position for a bench row.
+  const filledRow = (id, slotKey, chipType, kind) => {
     const p = metaOf(id);
     const live = playerOf(id);
-    const locked = isLockedNow(id, playerOf(id));
-    const pts = dayPts[String(id)] ? dayPts[String(id)].points : null;
-    const ilBad = t === "IL" && live && !live.ilStatus;
-    return `<div class="lu-row${cls}${selCls}${droppable}" data-slot="${slotKey}">` +
-      chip +
-      `<span class="lu-player" data-slot="${slotKey}">${avatarHTML(p, 34)}` +
+    const locked = isLockedNow(id, live);
+    const pts = ptsOf(id);
+    const ilBad = kind === "il" && live && !live.ilStatus;
+    const cls = kind === "bench" ? " bench" : kind === "il" ? " il" : "";
+    const chipCls = kind === "bench" ? "chip-BN" : "chip-" + chipType;
+    return `<div class="lu-row${cls}" data-id="${id}">` +
+      `<button class="slot-chip ${chipCls}${editable && !locked ? " tappable" : ""}" ` +
+      `data-act="${kind === "bench" ? "move-in" : "fill"}" data-slot="${slotKey}" data-id="${id}" ` +
+      `title="${escapeHtml(kind === "bench" ? "Move into the lineup" : "Choose a " + slotLabel(slotKey))}">` +
+      `${chipType}${editable && !locked ? `<span class="chip-caret">▾</span>` : ""}</button>` +
+      `<span class="lu-player" data-act="card" data-id="${id}">${avatarHTML(p, 34)}` +
       `<span class="lu-stack"><span class="lu-name">${escapeHtml(p.name)}</span>` +
       `<span class="lu-meta">${posBadges(p.positions, "sm")} ${escapeHtml(p.mlbTeam || "")}` +
       `${live && live.ilStatus ? ` <span class="il-flag">${escapeHtml(live.ilStatus)}</span>` : ""}` +
@@ -176,16 +265,37 @@ function renderMyTeam() {
       `${locked ? `<span class="lu-lock">🔒</span>` : ""}</span></div>`;
   };
 
-  const isHitterSlot = (k) => ["C", "1B", "2B", "3B", "SS", "INF", "OF", "UTIL"].includes(slotType(k));
-  const batters = SLOT_KEYS.filter((k) => isActiveSlot(k) && isHitterSlot(k));
-  const pitchers = SLOT_KEYS.filter((k) => isActiveSlot(k) && !isHitterSlot(k));
-  const bench = SLOT_KEYS.filter((k) => slotType(k) === "BN");
-  const il = SLOT_KEYS.filter((k) => slotType(k) === "IL");
-  const section = (title, keys) =>
-    `<div class="sec-head">${title}</div>${keys.map(rowFor).join("")}`;
+  const emptyRow = (slotKey) =>
+    `<div class="lu-row empty" data-act="fill" data-slot="${slotKey}">` +
+    `<span class="slot-chip chip-${slotType(slotKey)}${editable ? " tappable" : ""}">${slotType(slotKey)}` +
+    `${editable ? `<span class="chip-caret">＋</span>` : ""}</span>` +
+    `<span class="lu-empty">${editable ? "Empty — tap to fill" : "Empty"}</span></div>`;
+
+  const slotRow = (slotKey, kind) => {
+    const id = (kind === "il" ? il : active)[slotKey];
+    return id ? filledRow(id, slotKey, slotType(slotKey), kind) : emptyRow(slotKey);
+  };
+
+  const bench = benchIds(active, il).map(metaOf);
+  const benchHit = bench.filter((p) => !isPitcherPlayer(p));
+  const benchPit = bench.filter((p) => isPitcherPlayer(p));
+  const leadPos = (p) => (p.positions || []).find((x) => x !== "SP" && x !== "RP") || (p.positions || [])[0] || "BN";
+  const benchRows = (list) => list.map((p) => filledRow(p.mlbId, null, leadPos(p), "bench")).join("");
+
+  const hitterSlots = ACTIVE_KEYS.filter(isHitterSlot);
+  const pitcherSlots = ACTIVE_KEYS.filter((k) => !isHitterSlot(k));
+  const benchDivider = (n) => `<div class="bench-divider"><span>Bench</span><i>${n}</i></div>`;
+
+  const battersSec = `<div class="sec-head">Batters</div>` +
+    hitterSlots.map((k) => slotRow(k, "active")).join("") +
+    (benchHit.length ? benchDivider(benchHit.length) + benchRows(benchHit) : "");
+  const pitchersSec = `<div class="sec-head">Pitchers</div>` +
+    pitcherSlots.map((k) => slotRow(k, "active")).join("") +
+    (benchPit.length ? benchDivider(benchPit.length) + benchRows(benchPit) : "");
+  const ilSec = `<div class="sec-head">Injured List</div>` +
+    IL_KEYS.map((k) => slotRow(k, "il")).join("");
 
   // ---- Team summary card (record · rank · owner, week points, shortcuts) ----
-  const me = App.teams[App.myTeamId] || {};
   const cfgTeam = LEAGUE_TEAMS.find((x) => x.id === App.myTeamId) || {};
   const rank = myRank();
   const startsUsed = luScore && luScore.startsUsed != null ? luScore.startsUsed : null;
@@ -219,24 +329,18 @@ function renderMyTeam() {
     `<button class="dn-label" id="dn-today" title="Jump back to today">${dateLabel}</button>` +
     `<button class="dn-arrow" id="dn-next" ${canNext ? "" : "disabled"} aria-label="Next day">›</button>` +
     (dayTotal != null ? `<span class="pill">${dayTotal} pts</span>` : "") +
-    (App.date >= today ? `<button class="btn btn-ghost btn-small" id="btn-start-active">⚡ Start active players</button>` : "") +
+    (editable ? `<button class="btn btn-ghost btn-small" id="btn-start-active">⚡ Start active players</button>` : "") +
     `</div>`;
 
   host.innerHTML =
     card + dateNav +
-    (App.selectedSlot
-      ? `<p class="hint">Moving <b>${escapeHtml(metaOf(slots[App.selectedSlot]).name || "empty slot")}</b> — tap a highlighted slot, or tap again to cancel.</p>`
-      : `<p class="hint">Tap a player, then a highlighted slot, to set your lineup. 🔒 = locked (game started).</p>`) +
-    `<div class="lineup-grid">` +
-    section("Batters", batters) +
-    section("Pitchers", pitchers) +
-    section("Bench", bench) +
-    section("Injured List", il) +
-    `</div>`;
+    `<p class="hint">${editable
+      ? "Tap a position to pick a player for that spot, or tap a player to see his card. 🔒 = locked (game started)."
+      : "This day is final — lineups are read-only."}</p>` +
+    `<div class="lineup-grid">${battersSec}${pitchersSec}${ilSec}</div>`;
 
   const go = (days) => {
     App.date = addDays(App.date, days);
-    App.selectedSlot = null;
     luScore = null;
     subscribeDay();
     ensureMyTeamData();
@@ -244,65 +348,202 @@ function renderMyTeam() {
   const prev = $("#dn-prev"), next = $("#dn-next");
   if (prev) prev.addEventListener("click", () => go(-1));
   if (next) next.addEventListener("click", () => go(1));
-  $("#dn-today").addEventListener("click", () => { if (App.date !== today) go(0), App.date = today, ensureMyTeamData(); });
+  $("#dn-today").addEventListener("click", () => { if (App.date !== today) { App.date = today; luScore = null; subscribeDay(); ensureMyTeamData(); } });
   host.querySelectorAll(".tc-link").forEach((b) =>
     b.addEventListener("click", () => setTab(b.dataset.goto)));
-
   const sa = $("#btn-start-active");
-  if (sa) sa.addEventListener("click", async () => {
-    const { next: filled, moves } = startActivePlayers(slots);
-    if (!moves) return toast("Everyone with a game today is already starting.", "success");
-    try {
-      await saveLineupSlots(filled);
-      toast(`Moved ${moves} player${moves > 1 ? "s" : ""} into the lineup.`, "success");
-    } catch (e) {
-      toast("Couldn't save lineup: " + (e.message || "permission denied"), "error");
-    }
-    renderActive();
-  });
+  if (sa) sa.addEventListener("click", startActivePlayers);
 
-  host.querySelectorAll(".lu-row").forEach((row) =>
-    row.addEventListener("click", () => onSlotTap(row.dataset.slot, slots)));
+  host.querySelectorAll("[data-act]").forEach((el) =>
+    el.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const { act, slot, id } = el.dataset;
+      if (act === "card") return openPlayerCard(id);
+      if (!editable) return;
+      if (act === "fill") return openFillPicker(slot);
+      if (act === "move-in") return openMovePicker(id);
+    }));
 }
 
-async function onSlotTap(slotKey, slots) {
-  if (App.date < etDate()) return;
-  const id = slots[slotKey];
+// ---- Bottom-sheet helper -------------------------------------------------------
+// One reusable overlay, created lazily and appended to <body>. Closes on
+// backdrop tap, the ✕, or Escape.
+function ensureSheetHost() {
+  let host = $("#mt-sheet");
+  if (host) return host;
+  host = document.createElement("div");
+  host.id = "mt-sheet";
+  host.className = "modal-overlay";
+  host.hidden = true;
+  host.addEventListener("click", (e) => { if (e.target === host) closeSheet(); });
+  document.body.appendChild(host);
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeSheet(); });
+  return host;
+}
+function closeSheet() { const h = $("#mt-sheet"); if (h) { h.hidden = true; h.innerHTML = ""; } }
+function openSheet(innerHTML, wide) {
+  const host = ensureSheetHost();
+  host.innerHTML = `<div class="modal${wide ? " modal-wide" : ""}"><div class="sheet-grab"></div>` +
+    `<button class="sheet-close" data-close aria-label="Close">✕</button>${innerHTML}</div>`;
+  host.hidden = false;
+  host.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", closeSheet));
+  return host;
+}
 
-  if (!App.selectedSlot) {
-    if (!id) return;
-    if (isLockedNow(id, playerOf(id))) return toast(`${metaOf(id).name} is locked for ${fmtDay(App.date)}.`, "error");
-    App.selectedSlot = slotKey;
-    return renderActive();
+// A candidate/target row inside a picker.
+function pickerRow(id, tag, act, slot) {
+  const p = metaOf(id), live = playerOf(id);
+  const locked = isLockedNow(id, live);
+  return `<button class="pick-row${locked ? " locked" : ""}" ${locked ? "disabled" : ""} ` +
+    `data-pick="${act}" data-id="${id}"${slot ? ` data-slot="${slot}"` : ""}>` +
+    `${avatarHTML(p, 30)}<span class="lu-stack"><span class="lu-name">${escapeHtml(p.name)}</span>` +
+    `<span class="lu-meta">${posBadges(p.positions, "sm")} ${escapeHtml(p.mlbTeam || "")}` +
+    `${live && live.ilStatus ? ` <span class="il-flag">${escapeHtml(live.ilStatus)}</span>` : ""}</span>` +
+    `${live ? gameLineHTML(live) : ""}</span>` +
+    `<span class="pick-tag">${locked ? "🔒" : escapeHtml(tag || "")}</span></button>`;
+}
+
+// Tap a lineup slot → choose who fills it.
+function openFillPicker(slotKey) {
+  const { active, il } = currentAssignment();
+  const occupant = (IL_KEYS.includes(slotKey) ? il : active)[slotKey];
+  if (occupant && isLockedNow(occupant, playerOf(occupant)))
+    return toast(`${metaOf(occupant).name} is locked.`, "error");
+  const seated = { ...active, ...il };
+  const eligible = rosterIds().filter((id) => id !== occupant && playerFitsSlotKey(playerOf(id) || metaOf(id), slotKey));
+  const onBench = eligible.filter((id) => !Object.values(seated).includes(id));
+  const inLineup = eligible.filter((id) => Object.values(seated).includes(id));
+  const slotOf = (id) => Object.keys(seated).find((k) => seated[k] === id);
+
+  if (!eligible.length && !occupant)
+    return toast(`No one on your roster is eligible for ${slotLabel(slotKey)}.`, "error");
+
+  let body = `<h2>Choose a ${escapeHtml(slotLabel(slotKey))}</h2>`;
+  if (occupant) body += `<div class="pick-sub">Currently: <b>${escapeHtml(metaOf(occupant).name)}</b>` +
+    ` · <button class="link-btn" data-pick="bench" data-id="${occupant}">Move to bench</button></div>`;
+  if (onBench.length) body += `<div class="pick-group">From your bench</div>` +
+    onBench.map((id) => pickerRow(id, "Start", "fill", slotKey)).join("");
+  if (inLineup.length) body += `<div class="pick-group">Swap from your lineup</div>` +
+    inLineup.map((id) => pickerRow(id, slotType(slotOf(id)), "fill", slotKey)).join("");
+  if (!onBench.length && !inLineup.length) body += `<p class="empty-note">No other eligible players.</p>`;
+
+  const host = openSheet(body);
+  host.querySelectorAll("[data-pick]").forEach((b) => b.addEventListener("click", () => {
+    const id = b.dataset.id;
+    if (b.dataset.pick === "bench") return benchPlayer(id);
+    moveIntoSlot(id, slotKey);
+  }));
+}
+
+// Tap a bench player's chip → choose which slot he goes into.
+function openMovePicker(playerId) {
+  const p = playerOf(playerId) || metaOf(playerId);
+  if (isLockedNow(playerId, playerOf(playerId))) return toast(`${metaOf(playerId).name} is locked.`, "error");
+  const { active, il } = currentAssignment();
+  const targets = ACTIVE_KEYS.concat(IL_KEYS).filter((k) => playerFitsSlotKey(p, k));
+  if (!targets.length) return toast(`${metaOf(playerId).name} isn't eligible for any open slot.`, "error");
+
+  let body = `<h2>Move ${escapeHtml(metaOf(playerId).name)} into…</h2>`;
+  body += targets.map((k) => {
+    const occ = (IL_KEYS.includes(k) ? il : active)[k];
+    const occLocked = occ && isLockedNow(occ, playerOf(occ));
+    return `<button class="pick-row${occLocked ? " locked" : ""}" ${occLocked ? "disabled" : ""} data-slot="${k}">` +
+      `<span class="slot-chip chip-${slotType(k)}">${slotType(k)}</span>` +
+      `<span class="lu-stack"><span class="lu-name">${escapeHtml(slotLabel(k))}</span>` +
+      `<span class="lu-meta">${occ ? "Swap with " + escapeHtml(metaOf(occ).name) : "Open slot"}</span></span>` +
+      `<span class="pick-tag">${occLocked ? "🔒" : occ ? "Swap" : "Start"}</span></button>`;
+  }).join("");
+
+  const host = openSheet(body);
+  host.querySelectorAll("[data-slot]").forEach((b) =>
+    b.addEventListener("click", () => moveIntoSlot(playerId, b.dataset.slot)));
+}
+
+// ---- Player card ----------------------------------------------------------------
+function weekPtsFor(id) {
+  if (!luScore || !luScore.byPlayerDays) return null;
+  let s = 0, found = false;
+  Object.values(luScore.byPlayerDays).forEach((day) => {
+    if (day[String(id)]) { s += day[String(id)].points || 0; found = true; }
+  });
+  return found ? Math.round(s * 10) / 10 : null;
+}
+
+function openPlayerCard(id) {
+  const p = metaOf(id), live = playerOf(id) || {};
+  const abbr = p.mlbTeam || live.mlbTeam || "";
+  const colors = (typeof TEAM_COLORS !== "undefined" && TEAM_COLORS[abbr]) || null;
+  const band = colors ? colors.primary : "var(--panel-2)";
+  const band2 = colors ? (colors.secondary || colors.primary) : "var(--panel)";
+
+  const { active, il } = currentAssignment();
+  const seated = { ...active, ...il };
+  const inSlot = Object.keys(seated).find((k) => seated[k] === String(id));
+  const onMyRoster = rosterIds().includes(String(id));
+  const editable = App.date >= etDate() && onMyRoster;
+
+  // Ownership
+  const owner = live.rosteredBy ? teamName(live.rosteredBy) : null;
+  const status = onMyRoster ? "On your roster" : owner ? `Rostered by ${owner}` : "Free agent";
+
+  // Stat tiles
+  const wp = weekPtsFor(id), dp = (luScore && luScore.byPlayerDays && luScore.byPlayerDays[App.date]
+    && luScore.byPlayerDays[App.date][String(id)] || {}).points;
+  const appr = live.apprThisSeason || {};
+  const games = Object.values(appr).reduce((a, b) => a + b, 0) + (live.pitchedThisSeason || 0);
+  const tiles = [
+    [wp != null ? wp : "—", "WEEK PTS"],
+    [dp != null ? dp : "—", "TODAY"],
+    [games || "—", "GAMES"],
+    [(p.positions || []).length || "—", "SLOTS"],
+  ];
+
+  // Eligibility breakdown
+  const parts = [];
+  Object.entries(appr).sort((a, b) => b[1] - a[1]).forEach(([pos, g]) => parts.push(`${pos}: ${g} G`));
+  if (live.gsThisSeason) parts.push(`SP: ${live.gsThisSeason} GS`);
+  if (live.reliefThisSeason) parts.push(`RP: ${live.reliefThisSeason} apps`);
+
+  const g = gameFor(live.mlbTeamId ? live : p);
+
+  let actions = "";
+  if (editable) {
+    const locked = isLockedNow(id, live);
+    if (locked) actions = `<p class="hint">🔒 Locked — his game has started.</p>`;
+    else {
+      const btns = [];
+      if (inSlot && !IL_KEYS.includes(inSlot)) btns.push(`<button class="btn btn-ghost" data-card="bench">Move to bench</button>`);
+      if (!inSlot) btns.push(`<button class="btn" data-card="start">Move into lineup</button>`);
+      if (live.ilStatus && !(inSlot && IL_KEYS.includes(inSlot))) btns.push(`<button class="btn btn-ghost" data-card="il">Move to IL</button>`);
+      if (inSlot && IL_KEYS.includes(inSlot)) btns.push(`<button class="btn" data-card="activate">Activate</button>`);
+      actions = `<div class="pc-actions">${btns.join("")}</div>`;
+    }
   }
-  if (App.selectedSlot === slotKey) {
-    App.selectedSlot = null;
-    return renderActive();
-  }
 
-  // Swap selected → tapped.
-  const fromKey = App.selectedSlot;
-  const movingId = slots[fromKey];
-  const occupantId = slots[slotKey];
-  const moving = playerOf(movingId) || metaOf(movingId);
-  const occupant = occupantId ? (playerOf(occupantId) || metaOf(occupantId)) : null;
+  const body =
+    `<div class="pc-head" style="background:linear-gradient(120deg,${band},${band2})">` +
+    `<div class="pc-id">${avatarHTML(p, 66)}` +
+    `<div class="pc-name-wrap"><div class="pc-name">${escapeHtml(p.name)}</div>` +
+    `<div class="pc-sub">${(p.positions || []).join(", ") || "—"}${abbr ? " · " + escapeHtml(abbr) : ""}</div>` +
+    `<span class="pc-status">${escapeHtml(status)}${live.ilStatus ? ` · <b>${escapeHtml(live.ilStatus)}</b>` : ""}</span>` +
+    `</div></div>` +
+    `<div class="pc-tiles">${tiles.map(([v, l]) => `<div class="pc-tile"><b>${v}</b><span>${l}</span></div>`).join("")}</div>` +
+    `</div>` +
+    (g ? `<div class="pc-game">${g.status === "Final" ? "Final" : g.status === "Live" ? "● Live" : (g.firstPitchUTC ? fmtTimeET(g.firstPitchUTC) : "Today")}` +
+      ` · ${g.homeId === live.mlbTeamId ? "vs " + (mlbAbbr(g.awayId) || "") : "@ " + (mlbAbbr(g.homeId) || "")}</div>` : "") +
+    `<div class="pc-sec">Position eligibility</div>` +
+    `<div class="pc-badges">${posBadges(p.positions, "") || "<span class='hint'>—</span>"}</div>` +
+    (parts.length ? `<p class="hint">${escapeHtml(parts.join(" · "))} · this season</p>` : "") +
+    (live.statusDescription ? `<p class="hint">${escapeHtml(live.statusDescription)}</p>` : "") +
+    actions;
 
-  if (!playerFitsSlotKey(moving, slotKey))
-    return toast(`${moving.name} can't fill ${slotKey}${slotType(slotKey) === "IL" ? " (not on an MLB IL)" : ""}.`, "error");
-  if (occupant && isLockedNow(occupantId, playerOf(occupantId)))
-    return toast(`${occupant.name} is locked.`, "error");
-  if (occupant && !playerFitsSlotKey(occupant, fromKey))
-    return toast(`${occupant.name} can't move to ${fromKey}.`, "error");
-
-  const next = { ...slots, [slotKey]: movingId, [fromKey]: occupantId || null };
-  App.selectedSlot = null;
-  try {
-    await saveLineupSlots(next);
-    toast("Lineup saved.", "success");
-  } catch (e) {
-    toast("Couldn't save lineup: " + (e.message || "permission denied"), "error");
-  }
-  renderActive();
+  const host = openSheet(body);
+  host.querySelectorAll("[data-card]").forEach((b) => b.addEventListener("click", () => {
+    const a = b.dataset.card;
+    if (a === "bench" || a === "activate") return benchPlayer(id);
+    if (a === "start") { closeSheet(); return openMovePicker(id); }
+    if (a === "il") { const slot = IL_KEYS.find((k) => !il[k]); if (!slot) return toast("Your IL is full.", "error"); return moveIntoSlot(id, slot); }
+  }));
 }
 
 function setupNotice() {

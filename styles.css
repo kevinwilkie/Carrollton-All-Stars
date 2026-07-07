@@ -92,6 +92,22 @@
 .chip-INF, .chip-UTIL { background: #7f8aa3; color: #fff; }
 .chip-BN { background: var(--panel-2); color: var(--muted); border: 1px solid var(--line); }
 .chip-IL { background: var(--warn); color: #10141c; }
+.slot-chip { appearance: none; cursor: default; font-family: inherit; gap: 1px; padding: 0 4px; }
+.slot-chip.tappable { cursor: pointer; }
+.slot-chip.tappable:hover { filter: brightness(1.08); box-shadow: 0 0 0 2px var(--accent); }
+.chip-caret { font-size: 9px; opacity: .8; margin-top: -1px; }
+.lu-row.empty { cursor: pointer; border-style: dashed; }
+.lu-row.empty:hover { border-color: var(--accent); }
+
+/* Bench divider inside the Batters / Pitchers sections */
+.bench-divider {
+  display: flex; align-items: center; gap: 8px; margin: 8px 2px 3px;
+  font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .8px; color: var(--muted);
+}
+.bench-divider::before { content: ""; flex: 0 0 14px; }
+.bench-divider i { font-style: normal; background: var(--panel-2); border: 1px solid var(--line);
+  border-radius: 999px; padding: 0 7px; font-size: 10px; }
+.bench-divider::after { content: ""; flex: 1; height: 1px; background: var(--line); }
 
 .lu-player { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; cursor: pointer; }
 /* the name/badges/game column must shrink and clip — never slide under the points column */
@@ -106,6 +122,58 @@
 .lu-lock { font-size: 13px; width: 16px; text-align: center; }
 .lu-empty { color: var(--muted); font-style: italic; font-size: 14px; flex: 1; cursor: pointer; }
 .il-flag { color: var(--warn); font-size: 11px; font-weight: 700; }
+
+/* ---------------- Slot picker / move sheet ---------------- */
+.sheet-close {
+  position: absolute; top: 12px; right: 12px; z-index: 2;
+  appearance: none; cursor: pointer; font: inherit; font-size: 15px; line-height: 1;
+  background: var(--panel-2); color: var(--text); border: 1px solid var(--line);
+  border-radius: 999px; width: 30px; height: 30px;
+}
+.sheet-close:hover { border-color: var(--accent); color: var(--accent); }
+#mt-sheet .modal { position: relative; }
+.pick-sub { font-size: 13px; color: var(--muted); margin: 0 0 8px; }
+.pick-group {
+  font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .8px;
+  color: var(--cream); margin: 12px 0 4px;
+}
+.pick-row {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+  appearance: none; cursor: pointer; font: inherit;
+  background: var(--panel); color: var(--text); border: 1px solid var(--line);
+  border-radius: 10px; padding: 8px 10px; margin-bottom: 5px;
+}
+.pick-row:hover:not(:disabled) { border-color: var(--accent); }
+.pick-row:disabled { opacity: .5; cursor: not-allowed; }
+.pick-row .lu-stack { flex: 1; min-width: 0; }
+.pick-tag { flex: 0 0 auto; font-size: 12px; font-weight: 800; color: var(--muted); }
+
+/* ---------------- Player card ---------------- */
+.pc-head { margin: -18px -18px 12px; padding: 18px 18px 0; color: #fff; }
+.pc-id { display: flex; align-items: center; gap: 14px; }
+.pc-head .avatar { box-shadow: 0 0 0 3px rgba(255,255,255,.35); }
+.pc-name-wrap { min-width: 0; }
+.pc-name { font-size: 22px; font-weight: 900; text-shadow: 0 1px 3px rgba(0,0,0,.4); }
+.pc-sub { font-size: 13px; font-weight: 700; opacity: .92; text-shadow: 0 1px 2px rgba(0,0,0,.4); }
+.pc-status {
+  display: inline-block; margin-top: 6px; font-size: 12px; font-weight: 700;
+  background: rgba(0,0,0,.28); border-radius: 999px; padding: 3px 10px;
+}
+.pc-tiles { display: flex; gap: 8px; margin: 14px 0 0; padding-bottom: 2px; }
+.pc-tile {
+  flex: 1; text-align: center; background: rgba(0,0,0,.25);
+  border-radius: 10px; padding: 8px 4px;
+}
+.pc-tile b { display: block; font-size: 19px; font-weight: 900; }
+.pc-tile span { font-size: 9px; font-weight: 700; letter-spacing: .5px; opacity: .85; }
+.pc-game { font-size: 13px; font-weight: 700; color: var(--text); margin: 0 0 4px; }
+.pc-sec {
+  font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .8px;
+  color: var(--cream); margin: 12px 0 6px;
+}
+.pc-badges { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 4px; }
+.pc-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+.pc-actions .btn { flex: 1; text-align: center; }
 
 /* Phones: tighten spacing so the name/badges/game get the room */
 @media (max-width: 560px) {

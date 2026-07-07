@@ -22,7 +22,6 @@ const App = {
   trades: [],               // all trades (live)
   transactions: [],         // recent transaction log (live)
   date: etDate(),           // the day being viewed/edited on My Team
-  selectedSlot: null,       // lineup swap in progress
   unsubs: [],               // core listeners
   dayUnsubs: [],            // per-date listeners (lineup, mlbday)
 };
