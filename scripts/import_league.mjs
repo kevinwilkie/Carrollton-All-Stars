@@ -81,6 +81,9 @@ for (const raw of readFileSync(FILE, "utf8").split(/\r?\n/)) {
   if (head) { cur = { ...head, players: [] }; teams.push(cur); continue; }
   if (!cur || isNoise(line)) continue;
 
+  // Yahoo glues the IL tag onto the name ("Mike TroutIL10Player Note") —
+  // capture it before stripping so IL slots work from day one.
+  const ilTag = (line.match(/(IL\d+)/) || [])[1] || null;
   let name = line.replace(GLUED_NOISE, "");                 // glued Yahoo suffixes
   // Yahoo splits Ohtani into "(Batter)" / "(Pitcher)" entries — remember which.
   let roleHint = null;
@@ -90,7 +93,7 @@ for (const raw of readFileSync(FILE, "utf8").split(/\r?\n/)) {
     .replace(/\s+(Player Notes?|Notes?|DTD|IL\d*|NA)\b.*$/i, "")
     .replace(/\s+[A-Z]{2,3}\s*$/, "")       // trailing club like "KC"/"LAD" (old format)
     .trim();
-  if (name) cur.players.push({ line, name, roleHint });
+  if (name) cur.players.push({ line, name, roleHint, ilTag });
 }
 console.log(`Parsed ${teams.length} teams, ${teams.reduce((s, t) => s + t.players.length, 0)} players from ${FILE}`);
 if (!teams.length) process.exit(1);
@@ -150,14 +153,23 @@ if (unresolved.length) {
 }
 
 // ---- 3. eligibility from season splits ---------------------------------------------
+// Season-START eligibility comes from LAST season's games; THIS season's games
+// only ADD positions (Yahoo rule — nothing is lost mid-season).
 const resolved = teams.flatMap((t) => t.players.filter((p) => p.mlb));
-console.log(`\nFetching ${SEASON} splits for ${resolved.length} players (eligibility)…`);
-const splits = await MLB.seasonStats(resolved.map((p) => p.mlb.id), SEASON);
+console.log(`\nFetching ${SEASON - 1} + ${SEASON} splits for ${resolved.length} players (eligibility)…`);
+const [priorSplits, splits] = await Promise.all([
+  MLB.seasonStats(resolved.map((p) => p.mlb.id), SEASON - 1),
+  MLB.seasonStats(resolved.map((p) => p.mlb.id), SEASON),
+]);
 resolved.forEach((pl) => {
   const s = splits[pl.mlb.id] || { fielding: {}, pitching: null, primary: pl.mlb.primaryPosition?.abbreviation };
+  const prev = priorSplits[pl.mlb.id] || { fielding: {}, pitching: null };
   pl.positions = computePositions({
     primary: s.primary || pl.mlb.primaryPosition?.abbreviation || "",
-    apprLastSeason: {}, apprThisSeason: s.fielding,
+    apprLastSeason: prev.fielding, apprThisSeason: s.fielding,
+    gsLastSeason: prev.pitching?.gamesStarted || 0,
+    reliefLastSeason: Math.max(0, (prev.pitching?.games || 0) - (prev.pitching?.gamesStarted || 0)),
+    pitchedLastSeason: prev.pitching?.games || 0,
     gsThisSeason: s.pitching?.gamesStarted || 0,
     reliefThisSeason: Math.max(0, (s.pitching?.games || 0) - (s.pitching?.gamesStarted || 0)),
     pitchedThisSeason: s.pitching?.games || 0,
@@ -221,6 +233,7 @@ teams.forEach((t) => {
       mlbTeam: abbrOf[pl.mlb.currentTeam?.id] || "",
       primary: pl.mlb.primaryPosition?.abbreviation || "",
       positions: pl.positions, eligibleSlots: pl.slots,
+      ilStatus: pl.ilTag || null, // from the Yahoo paste; the nightly MLB sync takes over
       rosteredBy: t.team.id, updatedAt: now,
     }, { merge: true });
   });

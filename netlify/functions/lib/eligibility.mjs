@@ -1,8 +1,10 @@
 /*
- * Position eligibility (ESPN/Yahoo style), from league-config ELIGIBILITY:
+ * Position eligibility (Yahoo style), from league-config ELIGIBILITY:
  *   - a fielding position with 10+ appearances LAST season or 5+ THIS season
- *   - SP with 5+ starts either season (or any start when totals are tiny)
- *   - RP with 8+ relief appearances either season
+ *   - SP with 3+ starts either season (or any start when totals are tiny)
+ *   - RP with 5+ relief appearances either season
+ *   - eligibility earned from LAST season holds all year (union — never lost
+ *     mid-season); next season recomputes from this season's games alone
  *   - fallbacks: the player's MLB-listed primary position; pure DHs get DH.
  * OF is collapsed (LF/CF/RF all count as OF). Everything else keys the roster
  * slots via SLOT_ELIGIBILITY in shared/league-config.js.

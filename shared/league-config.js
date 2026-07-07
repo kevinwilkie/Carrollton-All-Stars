@@ -81,12 +81,12 @@
     IL:   HITTER_POSITIONS.concat(["SP", "RP"]), // plus: player must actually be on an MLB IL
   };
 
-  // Position eligibility thresholds (ESPN/Yahoo style), recomputed nightly:
-  // a fielding position counts with 10+ appearances last season OR 5+ this
-  // season; SP = 5+ GS (or any start if <8 total outings), RP = 8+ relief
-  // appearances, either season; a pitcher with neither threshold keeps his
-  // MLB-listed role.
-  const ELIGIBILITY = { lastSeasonGames: 10, thisSeasonGames: 5, spStarts: 5, rpRelief: 8 };
+  // Position eligibility (Yahoo style). Season START = positions earned LAST
+  // season; during the season a player can only ADD eligibility (5+ games at a
+  // new spot), never lose what he started with. Next season recomputes from
+  // this season alone — e.g. 5 relief outings last year grant RP all of this
+  // year, gone next year if he never relieves again.
+  const ELIGIBILITY = { lastSeasonGames: 10, thisSeasonGames: 5, spStarts: 3, rpRelief: 5 };
 
   // ---- Scoring ---------------------------------------------------------------
   // NOTE on walks: MLB counts intentional walks inside BB, and this league

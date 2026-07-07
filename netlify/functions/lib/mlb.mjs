@@ -140,8 +140,9 @@ export async function roster40(teamId, season) {
 
 export function ilStatusFromCode(code) {
   if (!code) return null;
-  if (/^D/i.test(code)) return code.toUpperCase();      // D10/D15/D60 → on IL
-  return null;
+  const m = String(code).toUpperCase().match(/^D(\d+)?/); // D7/D10/D15/D60 = injured lists
+  if (!m) return null;
+  return m[1] ? `IL${m[1]}` : "IL";
 }
 
 // Season fielding/pitching splits for a batch of players (eligibility seeding).
