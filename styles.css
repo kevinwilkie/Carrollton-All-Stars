@@ -25,47 +25,96 @@
 .gate-card p { color: var(--muted); margin: 0; font-size: 14px; }
 
 /* ---------------- My Team ---------------- */
-.date-strip { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
-.date-strip::-webkit-scrollbar { display: none; }
-.date-chip {
-  appearance: none; cursor: pointer; font: inherit; white-space: nowrap;
-  background: var(--panel); color: var(--muted); border: 1px solid var(--line);
-  border-radius: 999px; padding: 6px 13px; font-weight: 600; font-size: 13px;
+/* Team summary card (Yahoo/Sleeper-style header) */
+.team-card { padding: 14px 16px; }
+.tc-main { display: flex; align-items: center; gap: 12px; }
+.tc-text { flex: 1; min-width: 0; }
+.tc-name { font-size: 19px; font-weight: 900; letter-spacing: .2px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tc-sub { font-size: 13px; color: var(--muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tc-pts { text-align: right; flex: 0 0 auto; }
+.tc-pts b { display: block; font-size: 24px; font-weight: 900; line-height: 1; }
+.tc-pts span { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); }
+.tc-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.tc-link {
+  appearance: none; cursor: pointer; font: inherit; font-weight: 700; font-size: 13px;
+  background: var(--panel-2); color: var(--text); border: 1px solid var(--line);
+  border-radius: 999px; padding: 6px 12px;
 }
-.date-chip.on { background: var(--accent); border-color: var(--accent-deep); color: #fff; }
-.lineup-grid { display: flex; flex-direction: column; gap: 4px; margin-top: 12px; }
+.tc-link:hover { border-color: var(--accent); color: var(--accent); }
+
+/* Date navigation pill row */
+.date-nav { display: flex; align-items: center; gap: 8px; margin: 14px 0 4px; flex-wrap: wrap; }
+.dn-arrow {
+  appearance: none; cursor: pointer; font: inherit; font-size: 18px; font-weight: 800; line-height: 1;
+  background: var(--panel); color: var(--text); border: 1px solid var(--line);
+  border-radius: 999px; width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center;
+}
+.dn-arrow:disabled { opacity: .35; cursor: default; }
+.dn-arrow:not(:disabled):hover { border-color: var(--accent); color: var(--accent); }
+.dn-label {
+  appearance: none; cursor: pointer; font: inherit; font-weight: 800; font-size: 14px;
+  background: var(--panel); color: var(--text); border: 1px solid var(--line);
+  border-radius: 999px; padding: 7px 16px; min-width: 150px; text-align: center;
+}
+.dn-label:hover { border-color: var(--accent); }
+
+.lineup-grid { display: flex; flex-direction: column; gap: 5px; margin-top: 10px; }
+.sec-head {
+  font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;
+  color: var(--cream); margin: 14px 0 4px; padding-left: 2px;
+}
+.sec-head:first-child { margin-top: 4px; }
 .lu-row {
   display: flex; align-items: center; gap: 10px;
   background: var(--panel); border: 1px solid var(--line);
-  border-radius: 9px; padding: 6px 10px;
+  border-radius: 11px; padding: 8px 12px 8px 8px;
 }
-.lu-row.bench { background: var(--panel-2); opacity: .92; }
+.lu-row.bench { background: var(--panel-2); }
 .lu-row.il { background: var(--warn-bg); border-color: #4a3a1d; }
 .lu-row.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
-.lu-row.droppable { border-color: var(--good); cursor: pointer; }
-.lu-slot {
-  min-width: 44px; text-align: center; font-size: 11px; font-weight: 800;
-  letter-spacing: .5px; color: var(--muted); text-transform: uppercase;
+.lu-row.droppable { border-color: var(--good); cursor: pointer; box-shadow: 0 0 0 1px var(--good); }
+
+/* Colored slot chip on the left — the position button from the reference apps */
+.slot-chip {
+  flex: 0 0 auto; min-width: 42px; height: 34px; border-radius: 9px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 900; letter-spacing: .5px; color: #10141c;
+  background: var(--pos-slot); text-transform: uppercase;
 }
-.lu-player { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; cursor: pointer; }
-/* the name/badges column must shrink and clip — never slide under the time/pts columns */
+.chip-C  { background: var(--pos-C); color: #fff; }
+.chip-1B { background: var(--pos-1B); color: #fff; }
+.chip-2B { background: var(--pos-2B); }
+.chip-3B { background: var(--pos-3B); }
+.chip-SS { background: var(--pos-SS); }
+.chip-OF { background: var(--pos-OF); }
+.chip-SP { background: var(--pos-SP); }
+.chip-RP { background: var(--pos-RP); }
+.chip-INF, .chip-UTIL { background: #7f8aa3; color: #fff; }
+.chip-BN { background: var(--panel-2); color: var(--muted); border: 1px solid var(--line); }
+.chip-IL { background: var(--warn); color: #10141c; }
+
+.lu-player { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; cursor: pointer; }
+/* the name/badges/game column must shrink and clip — never slide under the points column */
 .lu-stack { flex: 1; min-width: 0; overflow: hidden; }
-.lu-name { display: block; font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.lu-meta { display: block; font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.lu-time { font-size: 11px; color: var(--muted); white-space: nowrap; flex: 0 0 auto; }
-.lu-pts { font-weight: 800; min-width: 44px; text-align: right; }
-.lu-lock { font-size: 13px; min-width: 20px; text-align: center; }
-.lu-empty { color: var(--muted); font-style: italic; font-size: 13px; flex: 1; cursor: pointer; }
-.divider-thin { border-top: 1px dashed var(--line); margin: 8px 0; }
+.lu-name { display: block; font-weight: 700; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lu-meta { display: block; font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+.lu-game { display: block; font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+.lu-game.live { color: var(--good); font-weight: 700; }
+.lu-game.none { font-style: italic; opacity: .8; }
+.lu-right { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; }
+.lu-pts { font-weight: 900; font-size: 16px; min-width: 40px; text-align: right; font-variant-numeric: tabular-nums; }
+.lu-lock { font-size: 13px; width: 16px; text-align: center; }
+.lu-empty { color: var(--muted); font-style: italic; font-size: 14px; flex: 1; cursor: pointer; }
 .il-flag { color: var(--warn); font-size: 11px; font-weight: 700; }
 
-/* Phones: tighten the fixed columns so the name/badges get the room */
+/* Phones: tighten spacing so the name/badges/game get the room */
 @media (max-width: 560px) {
-  .lu-row { gap: 7px; padding: 6px 8px; }
-  .lu-slot { min-width: 32px; }
-  .lu-time { font-size: 10px; }
-  .lu-pts { min-width: 26px; font-size: 14px; }
-  .lu-lock { min-width: 15px; }
+  .lu-row { gap: 8px; padding: 7px 10px 7px 7px; }
+  .slot-chip { min-width: 38px; height: 32px; }
+  .lu-pts { min-width: 32px; font-size: 15px; }
+  .tc-name { font-size: 17px; }
+  .tc-pts b { font-size: 21px; }
+  .dn-label { min-width: 130px; }
 }
 
 /* ---------------- Matchup / Scoreboard ---------------- */

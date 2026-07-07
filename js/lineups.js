@@ -66,6 +66,63 @@ function metaOf(mlbId) {
   return r ? { mlbId, name: r.name, positions: r.positions || [], mlbTeam: r.mlbTeam || "" } : { mlbId, name: "#" + mlbId, positions: [] };
 }
 
+function mlbAbbr(mlbTeamId) {
+  const t = (typeof TEAMS !== "undefined" ? TEAMS : []).find((x) => x.id === mlbTeamId);
+  return t ? t.abbr : "";
+}
+
+// "7:10 PM ET @ CIN" / "● Live vs MIA" / "Final @ TB" / "No game"
+function gameLineHTML(player) {
+  const g = gameFor(player);
+  if (!g) return `<span class="lu-game none">No game</span>`;
+  const oppId = player.mlbTeamId === g.homeId ? g.awayId : g.homeId;
+  const opp = `${player.mlbTeamId === g.homeId ? "vs" : "@"} ${mlbAbbr(oppId) || "—"}`;
+  if (g.status === "Final") return `<span class="lu-game">Final ${opp}</span>`;
+  if (g.status === "Live") return `<span class="lu-game live">● Live ${opp}</span>`;
+  return `<span class="lu-game">${g.firstPitchUTC ? fmtTimeET(g.firstPitchUTC) : ""} ${opp}</span>`;
+}
+
+function ordinal(n) {
+  return n + (["th", "st", "nd", "rd"][(n % 100 > 10 && n % 100 < 14) ? 0 : Math.min(n % 10, 4) % 4] || "th");
+}
+function myRank() {
+  const pct = (r) => { const g = (r.w || 0) + (r.l || 0) + (r.t || 0); return g ? ((r.w || 0) + 0.5 * (r.t || 0)) / g : 0; };
+  const ids = Object.entries(App.teams)
+    .sort(([, a], [, b]) => pct(b.record || {}) - pct(a.record || {}) || ((b.record || {}).pf || 0) - ((a.record || {}).pf || 0))
+    .map(([id]) => id);
+  const i = ids.indexOf(App.myTeamId);
+  return i < 0 ? null : `${ordinal(i + 1)} of ${ids.length}`;
+}
+
+// Yahoo's "Start Active Players": pull bench players with a game today into
+// empty active slots, then swap them in for starters who aren't playing.
+// Locked players never move; every swap is validated both directions.
+function startActivePlayers(slots) {
+  const next = { ...slots };
+  const active = SLOT_KEYS.filter(isActiveSlot);
+  const benchKeys = SLOT_KEYS.filter((k) => slotType(k) === "BN");
+  const hasGame = (id) => !!gameFor(playerOf(id));
+  const movable = (id) => id && playerOf(id) && !isLockedNow(id, playerOf(id));
+  let moves = 0;
+  benchKeys.forEach((bk) => {
+    const bid = next[bk];
+    if (!movable(bid) || !hasGame(bid)) return;
+    const bp = playerOf(bid);
+    let target = active.find((ak) => !next[ak] && playerFitsSlotKey(bp, ak));
+    if (!target) target = active.find((ak) => {
+      const oid = next[ak];
+      return movable(oid) && !hasGame(oid) && playerFitsSlotKey(bp, ak);
+    });
+    if (target) {
+      const oid = next[target] || null;
+      next[target] = bid;
+      next[bk] = oid;
+      moves++;
+    }
+  });
+  return { next, moves };
+}
+
 function renderMyTeam() {
   const host = $("#view-myteam");
   if (!App.fs) return host.innerHTML = setupNotice();
@@ -77,14 +134,6 @@ function renderMyTeam() {
   const slots = lineupSlotsForView();
   const today = etDate();
   const wk = weekFor(App.date);
-
-  // Date strip: yesterday through +7.
-  const chips = [];
-  for (let i = -1; i <= 7; i++) {
-    const d = addDays(today, i);
-    chips.push(`<button class="date-chip${d === App.date ? " on" : ""}" data-date="${d}">` +
-      `${i === 0 ? "Today" : i === 1 ? "Tomorrow" : fmtDay(d)}</button>`);
-  }
 
   const dayPts = (luScore && luScore.byPlayerDays && luScore.byPlayerDays[App.date]) || {};
   const dayTotal = (luScore && luScore.byDay && luScore.byDay[App.date]) ?? null;
@@ -105,56 +154,112 @@ function renderMyTeam() {
         droppable = " droppable";
       }
     }
+    const chip = `<span class="slot-chip chip-${t}">${t}</span>`;
     if (!id) {
       return `<div class="lu-row${cls}${selCls}${droppable}" data-slot="${slotKey}">` +
-        `<span class="lu-slot">${slotKey}</span><span class="lu-empty">empty</span></div>`;
+        `${chip}<span class="lu-empty">Empty</span></div>`;
     }
     const p = metaOf(id);
+    const live = playerOf(id);
     const locked = isLockedNow(id, playerOf(id));
-    const g = gameFor(playerOf(id));
     const pts = dayPts[String(id)] ? dayPts[String(id)].points : null;
-    const ilBad = t === "IL" && playerOf(id) && !playerOf(id).ilStatus;
+    const ilBad = t === "IL" && live && !live.ilStatus;
     return `<div class="lu-row${cls}${selCls}${droppable}" data-slot="${slotKey}">` +
-      `<span class="lu-slot">${slotKey}</span>` +
-      `<span class="lu-player" data-slot="${slotKey}">${avatarHTML(p, 28)}` +
+      chip +
+      `<span class="lu-player" data-slot="${slotKey}">${avatarHTML(p, 34)}` +
       `<span class="lu-stack"><span class="lu-name">${escapeHtml(p.name)}</span>` +
       `<span class="lu-meta">${posBadges(p.positions, "sm")} ${escapeHtml(p.mlbTeam || "")}` +
-      `${playerOf(id) && playerOf(id).ilStatus ? ` <span class="il-flag">${escapeHtml(playerOf(id).ilStatus)}</span>` : ""}` +
-      `${ilBad ? ` <span class="il-flag">⚠ not on MLB IL</span>` : ""}</span></span></span>` +
-      `<span class="lu-time">${g ? (g.status === "Final" ? "Final" : g.firstPitchUTC ? fmtTimeET(g.firstPitchUTC) : "") : "no game"}</span>` +
-      `<span class="lu-pts">${pts != null ? pts : "—"}</span>` +
-      `<span class="lu-lock">${locked ? "🔒" : ""}</span></div>`;
+      `${live && live.ilStatus ? ` <span class="il-flag">${escapeHtml(live.ilStatus)}</span>` : ""}` +
+      `${ilBad ? ` <span class="il-flag">⚠ not on MLB IL</span>` : ""}</span>` +
+      `${live ? gameLineHTML(live) : `<span class="lu-game none">No game</span>`}</span></span>` +
+      `<span class="lu-right"><span class="lu-pts">${pts != null ? pts : "—"}</span>` +
+      `${locked ? `<span class="lu-lock">🔒</span>` : ""}</span></div>`;
   };
 
-  const starters = SLOT_KEYS.filter((k) => isActiveSlot(k));
+  const isHitterSlot = (k) => ["C", "1B", "2B", "3B", "SS", "INF", "OF", "UTIL"].includes(slotType(k));
+  const batters = SLOT_KEYS.filter((k) => isActiveSlot(k) && isHitterSlot(k));
+  const pitchers = SLOT_KEYS.filter((k) => isActiveSlot(k) && !isHitterSlot(k));
   const bench = SLOT_KEYS.filter((k) => slotType(k) === "BN");
   const il = SLOT_KEYS.filter((k) => slotType(k) === "IL");
+  const section = (title, keys) =>
+    `<div class="sec-head">${title}</div>${keys.map(rowFor).join("")}`;
 
+  // ---- Team summary card (record · rank · owner, week points, shortcuts) ----
+  const me = App.teams[App.myTeamId] || {};
+  const cfgTeam = LEAGUE_TEAMS.find((x) => x.id === App.myTeamId) || {};
+  const rank = myRank();
   const startsUsed = luScore && luScore.startsUsed != null ? luScore.startsUsed : null;
-  host.innerHTML =
-    `<div class="view-head"><h2>${escapeHtml(teamName(App.myTeamId))}</h2><span>` +
+  const weekPts = (luScore && luScore.total) ?? 0;
+  const card =
+    `<div class="card team-card">` +
+    `<div class="tc-main">${avatarHTML({ name: teamName(App.myTeamId) }, 52)}` +
+    `<div class="tc-text"><div class="tc-name">${escapeHtml(teamName(App.myTeamId))}</div>` +
+    `<div class="tc-sub">${teamRecord(App.myTeamId)}${rank ? ` · ${rank}` : ""}` +
+    `${cfgTeam.owner ? ` · ${escapeHtml(cfgTeam.owner)}` : ""}</div></div>` +
+    `<div class="tc-pts"><b>${weekPts}</b><span>${wk ? `Week ${wk.n} pts` : "points"}</span></div></div>` +
+    `<div class="tc-actions">` +
+    `<button class="tc-link" data-goto="schedule">🗓️ Schedule</button>` +
+    `<button class="tc-link" data-goto="trades">🔁 Trade</button>` +
+    `<button class="tc-link" data-goto="transactions">📋 Activity</button>` +
     (startsUsed != null
       ? `<span class="pill${startsUsed >= PITCHING.maxStartsPerWeek ? " pill-warn" : ""}" ` +
         `title="Only ${PITCHING.maxStartsPerWeek} pitcher starts count per week">` +
-        `${startsUsed}/${PITCHING.maxStartsPerWeek} SP starts</span> `
+        `${startsUsed}/${PITCHING.maxStartsPerWeek} SP starts</span>`
       : "") +
-    `<span class="pill">${wk ? `Week ${wk.n}` : "off-season"}${dayTotal != null ? ` · ${dayTotal} pts ${fmtDay(App.date)}` : ""}</span></span></div>` +
-    `<div class="date-strip">${chips.join("")}</div>` +
+    `</div></div>`;
+
+  // ---- Date navigation (yesterday … +7 days) + auto-start ----
+  const canPrev = App.date > addDays(today, -1);
+  const canNext = App.date < addDays(today, 7);
+  const dateLabel = App.date === today ? `Today · ${fmtDay(App.date)}`
+    : App.date === addDays(today, 1) ? `Tomorrow · ${fmtDay(App.date)}` : fmtDay(App.date);
+  const dateNav =
+    `<div class="date-nav">` +
+    `<button class="dn-arrow" id="dn-prev" ${canPrev ? "" : "disabled"} aria-label="Previous day">‹</button>` +
+    `<button class="dn-label" id="dn-today" title="Jump back to today">${dateLabel}</button>` +
+    `<button class="dn-arrow" id="dn-next" ${canNext ? "" : "disabled"} aria-label="Next day">›</button>` +
+    (dayTotal != null ? `<span class="pill">${dayTotal} pts</span>` : "") +
+    (App.date >= today ? `<button class="btn btn-ghost btn-small" id="btn-start-active">⚡ Start active players</button>` : "") +
+    `</div>`;
+
+  host.innerHTML =
+    card + dateNav +
     (App.selectedSlot
       ? `<p class="hint">Moving <b>${escapeHtml(metaOf(slots[App.selectedSlot]).name || "empty slot")}</b> — tap a highlighted slot, or tap again to cancel.</p>`
       : `<p class="hint">Tap a player, then a highlighted slot, to set your lineup. 🔒 = locked (game started).</p>`) +
-    `<div class="lineup-grid">${starters.map(rowFor).join("")}` +
-    `<div class="divider-thin"></div>${bench.map(rowFor).join("")}` +
-    `<div class="divider-thin"></div>${il.map(rowFor).join("")}</div>`;
+    `<div class="lineup-grid">` +
+    section("Batters", batters) +
+    section("Pitchers", pitchers) +
+    section("Bench", bench) +
+    section("Injured List", il) +
+    `</div>`;
 
-  host.querySelectorAll(".date-chip").forEach((b) =>
-    b.addEventListener("click", () => {
-      App.date = b.dataset.date;
-      App.selectedSlot = null;
-      luScore = null;
-      subscribeDay();
-      ensureMyTeamData();
-    }));
+  const go = (days) => {
+    App.date = addDays(App.date, days);
+    App.selectedSlot = null;
+    luScore = null;
+    subscribeDay();
+    ensureMyTeamData();
+  };
+  const prev = $("#dn-prev"), next = $("#dn-next");
+  if (prev) prev.addEventListener("click", () => go(-1));
+  if (next) next.addEventListener("click", () => go(1));
+  $("#dn-today").addEventListener("click", () => { if (App.date !== today) go(0), App.date = today, ensureMyTeamData(); });
+  host.querySelectorAll(".tc-link").forEach((b) =>
+    b.addEventListener("click", () => setTab(b.dataset.goto)));
+
+  const sa = $("#btn-start-active");
+  if (sa) sa.addEventListener("click", async () => {
+    const { next: filled, moves } = startActivePlayers(slots);
+    if (!moves) return toast("Everyone with a game today is already starting.", "success");
+    try {
+      await saveLineupSlots(filled);
+      toast(`Moved ${moves} player${moves > 1 ? "s" : ""} into the lineup.`, "success");
+    } catch (e) {
+      toast("Couldn't save lineup: " + (e.message || "permission denied"), "error");
+    }
+    renderActive();
+  });
 
   host.querySelectorAll(".lu-row").forEach((row) =>
     row.addEventListener("click", () => onSlotTap(row.dataset.slot, slots)));
