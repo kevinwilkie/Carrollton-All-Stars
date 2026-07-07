@@ -520,6 +520,14 @@ function openPlayerCard(id) {
     }
   }
 
+  const summaryHTML =
+    (g ? `<div class="pc-game">${g.status === "Final" ? "Final" : g.status === "Live" ? "● Live" : (g.firstPitchUTC ? fmtTimeET(g.firstPitchUTC) : "Today")}` +
+      ` · ${g.homeId === live.mlbTeamId ? "vs " + (mlbAbbr(g.awayId) || "") : "@ " + (mlbAbbr(g.homeId) || "")}</div>` : "") +
+    `<div class="pc-sec">Position eligibility</div>` +
+    `<div class="pc-badges">${posBadges(p.positions, "") || "<span class='hint'>—</span>"}</div>` +
+    (parts.length ? `<p class="hint">${escapeHtml(parts.join(" · "))} · this season</p>` : "") +
+    (live.statusDescription ? `<p class="hint">${escapeHtml(live.statusDescription)}</p>` : "");
+
   const body =
     `<div class="pc-head" style="background:linear-gradient(120deg,${band},${band2})">` +
     `<div class="pc-id">${avatarHTML(p, 66)}` +
@@ -529,21 +537,53 @@ function openPlayerCard(id) {
     `</div></div>` +
     `<div class="pc-tiles">${tiles.map(([v, l]) => `<div class="pc-tile"><b>${v}</b><span>${l}</span></div>`).join("")}</div>` +
     `</div>` +
-    (g ? `<div class="pc-game">${g.status === "Final" ? "Final" : g.status === "Live" ? "● Live" : (g.firstPitchUTC ? fmtTimeET(g.firstPitchUTC) : "Today")}` +
-      ` · ${g.homeId === live.mlbTeamId ? "vs " + (mlbAbbr(g.awayId) || "") : "@ " + (mlbAbbr(g.homeId) || "")}</div>` : "") +
-    `<div class="pc-sec">Position eligibility</div>` +
-    `<div class="pc-badges">${posBadges(p.positions, "") || "<span class='hint'>—</span>"}</div>` +
-    (parts.length ? `<p class="hint">${escapeHtml(parts.join(" · "))} · this season</p>` : "") +
-    (live.statusDescription ? `<p class="hint">${escapeHtml(live.statusDescription)}</p>` : "") +
+    `<div class="pc-tabs"><button class="pc-tab on" data-tab="summary">Summary</button>` +
+    `<button class="pc-tab" data-tab="log">Game Log</button></div>` +
+    `<div class="pc-body">${summaryHTML}</div>` +
     actions;
 
   const host = openSheet(body);
+  const bodyEl = host.querySelector(".pc-body");
+  const pitcher = /:P$/.test(String(id)) || (!/:B$/.test(String(id)) && isPitcherPlayer(p));
+  host.querySelectorAll(".pc-tab").forEach((t) => t.addEventListener("click", () => {
+    host.querySelectorAll(".pc-tab").forEach((x) => x.classList.toggle("on", x === t));
+    if (t.dataset.tab === "summary") { bodyEl.innerHTML = summaryHTML; return; }
+    bodyEl.innerHTML = `<p class="hint">Loading game log…</p>`;
+    loadGameLog(id).then((rows) => { bodyEl.innerHTML = gameLogTable(rows, pitcher); })
+      .catch(() => { bodyEl.innerHTML = `<p class="hint">Game log isn't available right now.</p>`; });
+  }));
   host.querySelectorAll("[data-card]").forEach((b) => b.addEventListener("click", () => {
     const a = b.dataset.card;
     if (a === "bench" || a === "activate") return benchPlayer(id);
     if (a === "start") { closeSheet(); return openMovePicker(id); }
     if (a === "il") { const slot = IL_KEYS.find((k) => !il[k]); if (!slot) return toast("Your IL is full.", "error"); return moveIntoSlot(id, slot); }
   }));
+}
+
+// Game-by-game statlines as a scrollable table (batting or pitching columns).
+function gameLogTable(rows, pitcher) {
+  const half = pitcher ? "pitching" : "batting";
+  const games = (rows || []).filter((r) => r[half]);
+  if (!games.length) return `<p class="hint">No ${pitcher ? "pitching" : "batting"} games logged this season yet.</p>`;
+  const ip = (p) => p.inningsPitched || (p.outs != null ? `${Math.floor(p.outs / 3)}.${p.outs % 3}` : "0.0");
+  const cols = pitcher
+    ? ["IP", "H", "ER", "K", "BB", "W", "SV", "HLD"]
+    : ["PA", "H", "2B", "3B", "HR", "R", "RBI", "BB", "SB", "K"];
+  const cellsFor = (r) => {
+    const b = r.batting || {}, p = r.pitching || {};
+    return pitcher
+      ? [ip(p), p.hits || 0, p.earnedRuns || 0, p.strikeOuts || 0, p.baseOnBalls || 0, p.wins || 0, p.saves || 0, p.holds || 0]
+      : [b.plateAppearances || 0, b.hits || 0, b.doubles || 0, b.triples || 0, b.homeRuns || 0,
+         b.runs || 0, b.rbi || 0, b.baseOnBalls || 0, b.stolenBases || 0, b.strikeOuts || 0];
+  };
+  const head = `<tr><th class="ta-left">Date</th><th>PTS</th>${cols.map((c) => `<th>${c}</th>`).join("")}</tr>`;
+  const body = games.map((r) => {
+    const half2 = pitcher ? Scoring.round1(Scoring.scorePitching(r.pitching)) : Scoring.round1(Scoring.scoreHitting(r.batting));
+    return `<tr><td class="ta-left">${fmtDay(r.date)}</td><td class="gl-pts">${half2}</td>` +
+      cellsFor(r).map((v) => `<td>${v}</td>`).join("") + `</tr>`;
+  }).join("");
+  return `<div class="scroll-x gl-wrap"><table class="gl-table"><thead>${head}</thead><tbody>${body}</tbody></table></div>` +
+    `<p class="hint">${games.length} game${games.length > 1 ? "s" : ""} · fantasy points by our scoring.</p>`;
 }
 
 function setupNotice() {

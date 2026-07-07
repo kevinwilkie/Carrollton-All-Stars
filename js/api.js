@@ -114,6 +114,20 @@ async function loadWeekSchedule(week) {
   return d.exists ? d.data() : null;
 }
 
+// A player's game-by-game statlines, most recent first. Keyed by the MLB
+// person id (two-way ":B"/":P" ids share one set of boxscore lines). Queried
+// without a composite index — a season is ~160 docs — and cached per person.
+const _gameLogCache = {};
+async function loadGameLog(mlbId) {
+  const personId = +(String(mlbId).match(/^\d+/) || [0])[0];
+  if (!personId) return [];
+  if (_gameLogCache[personId]) return _gameLogCache[personId];
+  const snap = await L().collection("statlines").where("mlbId", "==", personId).get();
+  const rows = snap.docs.map((d) => d.data()).sort((a, b) => (a.date < b.date ? 1 : -1));
+  _gameLogCache[personId] = rows;
+  return rows;
+}
+
 // ---- writes -----------------------------------------------------------------------
 async function saveLineupSlots(slots) {
   const ref = L().collection("lineups").doc(`${App.myTeamId}_${App.date}`);

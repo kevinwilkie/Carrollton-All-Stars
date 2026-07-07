@@ -175,6 +175,28 @@
 .pc-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
 .pc-actions .btn { flex: 1; text-align: center; }
 
+/* Summary / Game Log tabs */
+.pc-tabs { display: flex; gap: 4px; margin: 12px 0 10px; border-bottom: 1px solid var(--line); }
+.pc-tab {
+  appearance: none; background: none; border: none; cursor: pointer; font: inherit;
+  font-weight: 800; font-size: 14px; color: var(--muted);
+  padding: 6px 10px 8px; border-bottom: 3px solid transparent; margin-bottom: -1px;
+}
+.pc-tab.on { color: var(--accent); border-bottom-color: var(--accent); }
+.pc-body { min-height: 40px; }
+
+.gl-wrap { max-height: 46vh; overflow-y: auto; }
+.gl-table { border-collapse: collapse; width: 100%; font-size: 13px; font-variant-numeric: tabular-nums; }
+.gl-table th {
+  position: sticky; top: 0; background: var(--ink-2); z-index: 1;
+  text-align: right; color: var(--muted); font-size: 11px; font-weight: 700;
+  padding: 6px 8px; white-space: nowrap; border-bottom: 1px solid var(--line);
+}
+.gl-table td { text-align: right; padding: 6px 8px; white-space: nowrap; border-bottom: 1px solid rgba(255,255,255,.05); }
+.gl-table .ta-left { text-align: left; }
+.gl-pts { font-weight: 800; color: var(--text); }
+html[data-theme="vintage"] .gl-table td { border-bottom-color: rgba(34,51,92,.08); }
+
 /* Phones: tighten spacing so the name/badges/game get the room */
 @media (max-width: 560px) {
   .lu-row { gap: 8px; padding: 7px 10px 7px 7px; }
