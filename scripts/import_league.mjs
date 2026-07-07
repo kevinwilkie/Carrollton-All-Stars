@@ -10,18 +10,14 @@
  *       (starting next Monday, last ≤3 weeks = playoffs) and generates the
  *       schedule, so the 30-minute ingest starts scoring real games.
  *
- * rosters.txt format — copy/paste from Yahoo and lightly tidy:
+ * rosters file: paste Yahoo's league Rosters page RAW — team headers like
+ * "Acuña Matata (13-2)" (name + record) and all the glued "Player Note"/
+ * "IL10"/game-time noise are handled. Yahoo's split Ohtani (Batter)/(Pitcher)
+ * entries are detected and position-restricted. A tidy "## Team (W-L)" +
+ * plain-names format works too. Check parsing first:
  *
- *   ## Acuña Matata (12-8-1)
- *   José Ramírez
- *   Aaron Judge
- *   ...
- *   ## Rally Cats (10-11)
- *   ...
+ *   node scripts/import_league.mjs scripts/data/yahoo-rosters-2026.txt --parse-only
  *
- * A "## " line starts a team (matched loosely against league-config names;
- * the (W-L) or (W-L-T) record is optional). Player lines can carry Yahoo
- * junk — "C - José Ramírez Cle 3B" works — but one player per line.
  * Unresolved names are listed at the end; fix the line and re-run.
  * --write needs FIREBASE_SERVICE_ACCOUNT_B64 (SETUP.md §6).
  */
@@ -43,36 +39,69 @@ const norm = (s) => String(s || "").toLowerCase().normalize("NFD").replace(/[̀-
   .replace(/[.'’`-]/g, "").replace(/[^a-z0-9]+/g, " ").replace(/\b(jr|sr|ii|iii|iv)\b/g, "").trim();
 
 // ---- 1. parse the paste ---------------------------------------------------------
-const POS_TOKENS = /^(C|1B|2B|3B|SS|OF|LF|CF|RF|UTIL|Util|SP|RP|P|BN|IL|IL10|IL15|IL60|NA|DTD)\b[\s\-–:]*/;
+// Handles both raw Yahoo roster-page pastes and tidy "## Team" files.
+const POS_SET = new Set(["C", "1B", "2B", "3B", "SS", "IF", "INF", "OF", "LF", "CF", "RF",
+  "UTIL", "Util", "SP", "RP", "P", "DH", "BN", "IL", "NA"]);
+const POS_TOKENS = /^(C|1B|2B|3B|SS|IF|OF|LF|CF|RF|UTIL|Util|SP|RP|P|BN|IL|IL10|IL15|IL60|NA|DTD)\b[\s\-–:]*/;
+// Yahoo glues status/notes right onto the name: "Cal RaleighPlayer Note",
+// "Mike TroutIL10Player Note", "Matt ChapmanIL10Video ForecastPlayer Note".
+const GLUED_NOISE = /(?:No new player Notes?|New Player Note|Video Forecast|Player Notes?|IL\d+|DTD|SUSP|NA)+$/;
+
+function matchTeamHeader(line) {
+  const explicit = line.startsWith("##");
+  const rec = line.match(/\((\d+)-(\d+)(?:-(\d+))?\)/);
+  if (!explicit && !rec) return null; // raw Yahoo headers carry the record
+  const nameOnly = norm(line.replace(/^#+\s*/, "").replace(/\(.*?\)/, ""));
+  if (!nameOnly) return null;
+  const team = LEAGUE_TEAMS.find((t) => {
+    const tn = norm(t.name);
+    return tn === nameOnly || tn.includes(nameOnly) || nameOnly.includes(tn);
+  });
+  if (!team && explicit) { console.error(`✗ team header didn't match any league team: "${line}"`); process.exit(1); }
+  if (!team) return null;
+  return { team, record: rec ? { w: +rec[1], l: +rec[2], t: +(rec[3] || 0) } : null };
+}
+
+function isNoise(line) {
+  if (/^(Pos|Player)$/i.test(line)) return true;                    // Yahoo table headers
+  if (POS_SET.has(line.replace(/[\s\t]+$/, ""))) return true;      // bare slot cell ("C", "BN", …)
+  if (/^\d{1,2}:\d{2}\s*(am|pm)/i.test(line)) return true;         // game times
+  // club + position list line, e.g. "SEA - C" / "STL - 2B,3B,SS" / "LAD - Util"
+  const m = line.match(/^[A-Z]{2,3}\s*-\s*(.+)$/);
+  if (m && m[1].split(/[,\s]+/).filter(Boolean).every((tok) => POS_SET.has(tok))) return true;
+  return false;
+}
+
 const teams = [];
 let cur = null;
 for (const raw of readFileSync(FILE, "utf8").split(/\r?\n/)) {
   const line = raw.trim();
   if (!line) continue;
-  if (line.startsWith("##")) {
-    const head = line.replace(/^#+\s*/, "");
-    const rec = head.match(/\((\d+)-(\d+)(?:-(\d+))?\)/);
-    const nameOnly = norm(head.replace(/\(.*?\)/, ""));
-    const team = LEAGUE_TEAMS.find((t) => {
-      const tn = norm(t.name);
-      return tn === nameOnly || tn.includes(nameOnly) || nameOnly.includes(tn);
-    });
-    if (!team) { console.error(`✗ team header didn't match any league team: "${head}"`); process.exit(1); }
-    cur = { team, record: rec ? { w: +rec[1], l: +rec[2], t: +(rec[3] || 0) } : null, players: [] };
-    teams.push(cur);
-    continue;
-  }
-  if (!cur) continue;
-  // strip leading slot tokens, trailing "Cle - 3B"-style club/pos noise
-  let name = line.replace(POS_TOKENS, "").replace(/\s+-\s+.*$/, "")
+  const head = matchTeamHeader(line);
+  if (head) { cur = { ...head, players: [] }; teams.push(cur); continue; }
+  if (!cur || isNoise(line)) continue;
+
+  let name = line.replace(GLUED_NOISE, "");                 // glued Yahoo suffixes
+  // Yahoo splits Ohtani into "(Batter)" / "(Pitcher)" entries — remember which.
+  let roleHint = null;
+  const role = name.match(/\((Batter|Pitcher)\)\s*$/i);
+  if (role) { roleHint = role[1].toLowerCase(); name = name.replace(/\(.*?\)\s*$/, ""); }
+  name = name.replace(POS_TOKENS, "").replace(/\s+-\s+.*$/, "")
     .replace(/\s+(Player Notes?|Notes?|DTD|IL\d*|NA)\b.*$/i, "")
-    .replace(/\s+[A-Z][a-z]{1,2}\s*$/, "")  // trailing club like "Cle" (best effort)
-    .replace(/\s+[A-Z]{2,3}\s*$/, "")       // trailing club like "KC"/"LAD"/"NYY"
+    .replace(/\s+[A-Z]{2,3}\s*$/, "")       // trailing club like "KC"/"LAD" (old format)
     .trim();
-  if (name) cur.players.push({ line, name });
+  if (name) cur.players.push({ line, name, roleHint });
 }
 console.log(`Parsed ${teams.length} teams, ${teams.reduce((s, t) => s + t.players.length, 0)} players from ${FILE}`);
 if (!teams.length) process.exit(1);
+
+if (flag("parse-only")) {
+  teams.forEach((t) => {
+    console.log(`\n## ${t.team.name}${t.record ? ` (${t.record.w}-${t.record.l}${t.record.t ? "-" + t.record.t : ""})` : ""} — ${t.players.length} players`);
+    t.players.forEach((p) => console.log(`  ${p.name}${p.roleHint ? ` [${p.roleHint}]` : ""}`));
+  });
+  process.exit(0);
+}
 
 // ---- 2. resolve names against the full MLB player list ----------------------------
 console.log(`Fetching the ${SEASON} MLB player universe…`);
@@ -116,7 +145,24 @@ resolved.forEach((pl) => {
     reliefThisSeason: Math.max(0, (s.pitching?.games || 0) - (s.pitching?.gamesStarted || 0)),
     pitchedThisSeason: s.pitching?.games || 0,
   });
+  // Yahoo's split Ohtani: the (Batter) entry keeps hitter positions, the
+  // (Pitcher) entry keeps SP/RP — so lineups slot correctly on both teams.
+  if (pl.roleHint === "batter") pl.positions = pl.positions.filter((p) => !["SP", "RP"].includes(p));
+  if (pl.roleHint === "pitcher") pl.positions = pl.positions.filter((p) => ["SP", "RP"].includes(p));
   pl.slots = eligibleSlots(pl.positions);
+});
+
+// A player on two rosters (Yahoo batter/pitcher split) breaks our one-owner
+// model in a known, tolerable way — warn loudly.
+const seenOn = {};
+teams.forEach((t) => t.players.filter((p) => p.mlb).forEach((pl) => {
+  (seenOn[pl.mlb.id] = seenOn[pl.mlb.id] || []).push(t.team.name);
+}));
+Object.entries(seenOn).filter(([, on]) => on.length > 1).forEach(([id, on]) => {
+  const nm = resolved.find((p) => String(p.mlb.id) === id)?.mlb.fullName;
+  console.warn(`\n⚠ ${nm} appears on ${on.join(" AND ")} (Yahoo batter/pitcher split).`);
+  console.warn(`  Our scoring credits a player's FULL line (bat + arm) to whichever team`);
+  console.warn(`  starts him — expect his points to differ from Yahoo on those teams.`);
 });
 
 if (!flag("write")) {
