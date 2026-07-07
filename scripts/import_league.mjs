@@ -113,15 +113,32 @@ const byName = {};
 const clubs = await MLB.allTeams(SEASON);
 const abbrOf = Object.fromEntries(clubs.map((c) => [c.id, c.abbreviation]));
 
-const unresolved = [];
-teams.forEach((t) => t.players.forEach((pl) => {
-  const cands = byName[norm(pl.name)] || [];
-  if (cands.length === 1) pl.mlb = cands[0];
-  else if (cands.length > 1) {
-    pl.mlb = cands.find((c) => c.active) || cands[0];
+const pick = (pl, index) => {
+  const cands = index[norm(pl.name)] || [];
+  if (!cands.length) return false;
+  pl.mlb = cands.length === 1 ? cands[0] : (cands.find((c) => c.active) || cands[0]);
+  if (cands.length > 1)
     console.warn(`  ⚠ "${pl.name}" matched ${cands.length} players — using ${pl.mlb.fullName} (${pl.mlb.currentTeam?.id || "?"}). Edit the line if wrong.`);
-  } else unresolved.push({ team: t.team.name, line: pl.line, name: pl.name });
+  return true;
+};
+
+let unresolved = [];
+teams.forEach((t) => t.players.forEach((pl) => {
+  if (!pick(pl, byName)) unresolved.push({ team: t.team.name, pl });
 }));
+
+// Long-term IL players who haven't appeared this season are missing from the
+// current player list — retry against last season's before giving up.
+if (unresolved.length) {
+  console.log(`Retrying ${unresolved.length} unresolved against the ${SEASON - 1} player list (long-term IL)…`);
+  const prev = await MLB.fetchJson(`https://statsapi.mlb.com/api/v1/sports/1/players?season=${SEASON - 1}`);
+  const prevByName = {};
+  (prev.people || []).forEach((p) => {
+    (prevByName[norm(p.fullName)] = prevByName[norm(p.fullName)] || []).push(p);
+  });
+  unresolved = unresolved.filter(({ pl }) => !pick(pl, prevByName));
+}
+unresolved = unresolved.map(({ team, pl }) => ({ team, line: pl.line, name: pl.name }));
 
 teams.forEach((t) => {
   const okCount = t.players.filter((p) => p.mlb).length;
