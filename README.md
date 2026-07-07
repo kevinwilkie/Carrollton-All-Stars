@@ -26,6 +26,7 @@ box scores come from the free MLB Stats API (statsapi.mlb.com).
 - **Roster (30):** C · 1B · 2B · 3B · SS · INF · OF×4 · UTIL×2 · SP×4 · RP×4 · 6 bench · 4 IL (real MLB IL only)
 - **Scoring — hitters:** 1B 1 · 2B 2 · 3B 3 · HR 4 · BB 1 · IBB +1 · R 1 · RBI 1 · SB 2 · K −1
 - **Scoring — pitchers:** IP 3/inning · K 1 · W 2 · QS 5 · SV 5 · HLD 2 · CG 3 · SHO 3 · ER −2 · H −1 · BB −1
+- **Pitching cap:** only the first **7 pitcher starts** count per scoring week (counted in game order; extra starts score zero)
 - **Draft:** $300 auction, 26 spots, hat-twist nominations by MLB club
 - **Waivers:** daily FAAB, $100/season, $1 minimum, processed ~3am ET (ties → worse record)
 - **Trades:** 1-day review; blocked only by 6+ vetoes from the other 10 owners

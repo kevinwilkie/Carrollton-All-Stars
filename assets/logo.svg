@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">
+  <!-- Carrollton All-Stars badge (SVG rendition of the league logo).
+       To use the original artwork instead, save it as assets/logo.png and
+       swap the <img> paths in index.html / draft/index.html. -->
+  <defs>
+    <path id="cas-arc" d="M 52 210 A 148 148 0 0 1 348 210"/>
+    <clipPath id="cas-clip"><circle cx="200" cy="200" r="168"/></clipPath>
+  </defs>
+
+  <circle cx="200" cy="200" r="196" fill="#22335C"/>
+  <circle cx="200" cy="200" r="178" fill="#F4EAD5"/>
+  <circle cx="200" cy="200" r="168" fill="none" stroke="#22335C" stroke-width="7"/>
+
+  <g clip-path="url(#cas-clip)">
+    <!-- baseball stitching -->
+    <path d="M118 96 Q86 200 118 304" fill="none" stroke="#B23B34" stroke-width="9" stroke-dasharray="3 13" stroke-linecap="round"/>
+    <path d="M282 96 Q314 200 282 304" fill="none" stroke="#B23B34" stroke-width="9" stroke-dasharray="3 13" stroke-linecap="round"/>
+    <!-- infield dirt peeking at the bottom -->
+    <path d="M110 330 Q200 268 290 330 L290 372 L110 372 Z" fill="#B23B34"/>
+    <!-- navy swoosh carrying the script -->
+    <path d="M20 236 Q210 292 384 202 L384 312 Q205 366 20 320 Z" fill="#22335C"/>
+    <!-- home plate -->
+    <path d="M186 332 L214 332 L214 348 L200 360 L186 348 Z" fill="#F4EAD5"/>
+  </g>
+
+  <!-- red star -->
+  <polygon fill="#B23B34" stroke="#22335C" stroke-width="6" stroke-linejoin="round"
+    points="200,82 214.1,120.6 255.2,122.1 222.8,147.4 234.1,186.9 200,164 165.9,186.9 177.2,147.4 144.8,122.1 185.9,120.6"/>
+
+  <!-- arched wordmark -->
+  <text font-family="'Arial Black','Segoe UI',sans-serif" font-size="40" font-weight="900"
+        fill="#22335C" letter-spacing="4">
+    <textPath href="#cas-arc" startOffset="50%" text-anchor="middle">CARROLLTON</textPath>
+  </text>
+
+  <!-- script -->
+  <text x="202" y="296" font-family="'Brush Script MT','Snell Roundhand','Segoe Script',cursive"
+        font-size="86" fill="#F4EAD5" text-anchor="middle" transform="rotate(-5 200 280)">All Stars</text>
+</svg>

@@ -46,6 +46,23 @@ function fmtTimeET(isoUtc) {
     { hour: "numeric", minute: "2-digit", timeZone: "America/New_York" }) + " ET";
 }
 
+// ---- Theme ("classic" dark / "vintage" logo palette) --------------------------
+// Applied per device; both apps call wireThemeButton() on their topbar button.
+// index.html also sets data-theme inline in <head> so there's no flash.
+function themeLabel() {
+  return document.documentElement.dataset.theme === "vintage" ? "🌙 Classic" : "⭐ Vintage";
+}
+function wireThemeButton(btn) {
+  if (!btn) return;
+  btn.textContent = themeLabel();
+  btn.addEventListener("click", () => {
+    const next = document.documentElement.dataset.theme === "vintage" ? "classic" : "vintage";
+    document.documentElement.dataset.theme = next;
+    try { localStorage.setItem("cas_theme", next); } catch (e) {}
+    btn.textContent = themeLabel();
+  });
+}
+
 // ---- Toast -------------------------------------------------------------------
 let _toastTimer = null;
 function toast(msg, kind) {

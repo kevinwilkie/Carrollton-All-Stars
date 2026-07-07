@@ -124,6 +124,12 @@
     vetoesNeeded: 6,       // majority of the 10 non-involved owners
   };
 
+  // ---- Pitching limits ---------------------------------------------------------
+  // Max pitcher STARTS that count per scoring week. Starts are counted in game
+  // order; once a team hits the cap, additional starts that week score zero
+  // (the start is flagged on the matchup so owners can see it was capped).
+  const PITCHING = { maxStartsPerWeek: 7 };
+
   // ---- Two-way players (Yahoo-style split) ------------------------------------
   // These MLB person ids exist as TWO separate fantasy players: "{id}:B"
   // (batter — hitter positions, scores only batting) and "{id}:P" (pitcher —
@@ -146,6 +152,6 @@
     LEAGUE, LEAGUE_TEAMS, COMMISH_EMAILS,
     BUDGET, ROSTER_SIZE, LINEUP_SLOTS, BENCH_SLOTS, IL_SLOTS,
     HITTER_POSITIONS, SLOT_ELIGIBILITY, ELIGIBILITY,
-    SCORING, SEASON_STRUCTURE, FAAB, TRADE, KEEPER, TWO_WAY_PLAYERS,
+    SCORING, SEASON_STRUCTURE, FAAB, TRADE, KEEPER, TWO_WAY_PLAYERS, PITCHING,
   };
 });

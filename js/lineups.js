@@ -130,9 +130,15 @@ function renderMyTeam() {
   const bench = SLOT_KEYS.filter((k) => slotType(k) === "BN");
   const il = SLOT_KEYS.filter((k) => slotType(k) === "IL");
 
+  const startsUsed = luScore && luScore.startsUsed != null ? luScore.startsUsed : null;
   host.innerHTML =
-    `<div class="view-head"><h2>${escapeHtml(teamName(App.myTeamId))}</h2>` +
-    `<span class="pill">${wk ? `Week ${wk.n}` : "off-season"}${dayTotal != null ? ` · ${dayTotal} pts ${fmtDay(App.date)}` : ""}</span></div>` +
+    `<div class="view-head"><h2>${escapeHtml(teamName(App.myTeamId))}</h2><span>` +
+    (startsUsed != null
+      ? `<span class="pill${startsUsed >= PITCHING.maxStartsPerWeek ? " pill-warn" : ""}" ` +
+        `title="Only ${PITCHING.maxStartsPerWeek} pitcher starts count per week">` +
+        `${startsUsed}/${PITCHING.maxStartsPerWeek} SP starts</span> `
+      : "") +
+    `<span class="pill">${wk ? `Week ${wk.n}` : "off-season"}${dayTotal != null ? ` · ${dayTotal} pts ${fmtDay(App.date)}` : ""}</span></span></div>` +
     `<div class="date-strip">${chips.join("")}</div>` +
     (App.selectedSlot
       ? `<p class="hint">Moving <b>${escapeHtml(metaOf(slots[App.selectedSlot]).name || "empty slot")}</b> — tap a highlighted slot, or tap again to cancel.</p>`

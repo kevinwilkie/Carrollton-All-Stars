@@ -168,36 +168,79 @@ export async function recomputeScores(date) {
     return line.points || 0;
   };
 
-  const dayPoints = {};   // teamId -> points for `date`
-  const dayDetail = {};   // teamId -> { rosterId: {slot, points} }
+  // League rule: only the first N pitcher starts per team count each week.
+  // Starts are ordered by first pitch; a capped start scores zero (any batting
+  // by the same player still counts). Prior days' usage lives on the score doc.
+  const startCap = (CFG.PITCHING && CFG.PITCHING.maxStartsPerWeek) || Infinity;
+  const daySnap2 = await L.collection("mlbdays").doc(date).get();
+  const firstPitchOf = {};
+  ((daySnap2.exists && daySnap2.data().games) || []).forEach((g) => {
+    firstPitchOf[g.gamePk] = g.firstPitchUTC || "9999";
+  });
+
+  const weekTotals = {};
+  const batch = db().batch();
   for (const t of CFG.LEAGUE_TEAMS) {
     const lsnap = await L.collection("lineups").doc(`${t.id}_${date}`).get();
     const locked = lsnap.exists ? lsnap.data().locked || {} : {};
+
+    const ref = L.collection("scores").doc(`${t.id}_${week.n}`);
+    const snap = await ref.get();
+    const prev = snap.exists ? snap.data() : {};
+    const byDay = prev.byDay || {};
+    const byPlayerDays = prev.byPlayerDays || {};
+    const byDayStarts = prev.byDayStarts || {};
+
+    // Which of today's locked, active players started a game?
+    const startsBefore = Object.entries(byDayStarts)
+      .filter(([d]) => d < date)
+      .reduce((s, [, arr]) => s + (arr ? arr.length : 0), 0);
+    const starters = Object.entries(locked)
+      .filter(([id, slot]) => {
+        if (!isActiveSlot(slot)) return false;
+        const [person, role] = String(id).split(":");
+        if (role === "B") return false; // a split batter half never pitches
+        const line = stats[person];
+        return !!(line && line.pitching && line.pitching.gamesStarted);
+      })
+      .map(([id]) => {
+        const gamePks = (stats[String(id).split(":")[0]].gamePks) || [];
+        const t0 = gamePks.map((g) => firstPitchOf[g] || "9999").sort()[0] || "9999";
+        return { id, t0 };
+      })
+      .sort((a, b) => (a.t0 < b.t0 ? -1 : 1));
+    const allowed = Math.max(0, startCap - startsBefore);
+    const countedStarts = starters.slice(0, allowed).map((s) => s.id);
+    const cappedStarts = new Set(starters.slice(allowed).map((s) => s.id));
+
     let total = 0;
     const detail = {};
     Object.entries(locked).forEach(([mlbId, slot]) => {
       if (!isActiveSlot(slot)) return;
-      const p = pointsFor(mlbId);
+      let p;
+      if (cappedStarts.has(mlbId)) {
+        // Over the weekly start cap: pitching from this start doesn't count.
+        const line = stats[String(mlbId).split(":")[0]];
+        const role = String(mlbId).split(":")[1];
+        p = role === "P" ? 0 : Scoring.round1(Scoring.scoreHitting(line && line.batting));
+      } else {
+        p = pointsFor(mlbId);
+      }
       total += p;
-      if (p) detail[mlbId] = { slot, points: p };
+      if (p || cappedStarts.has(mlbId))
+        detail[mlbId] = { slot, points: p, ...(cappedStarts.has(mlbId) ? { cappedStart: true } : {}) };
     });
-    dayPoints[t.id] = Math.round(total * 10) / 10;
-    dayDetail[t.id] = detail;
-  }
 
-  // Fold the day into each team's week score doc.
-  const weekTotals = {};
-  const batch = db().batch();
-  for (const t of CFG.LEAGUE_TEAMS) {
-    const ref = L.collection("scores").doc(`${t.id}_${week.n}`);
-    const snap = await ref.get();
-    const byDay = snap.exists ? snap.data().byDay || {} : {};
-    byDay[date] = dayPoints[t.id];
-    const total = Math.round(Object.values(byDay).reduce((s, v) => s + v, 0) * 10) / 10;
-    weekTotals[t.id] = total;
-    const byPlayerDays = snap.exists ? snap.data().byPlayerDays || {} : {};
-    byPlayerDays[date] = dayDetail[t.id];
-    batch.set(ref, { teamId: t.id, week: week.n, byDay, byPlayerDays, total, updatedAt: new Date().toISOString() });
+    byDay[date] = Math.round(total * 10) / 10;
+    byPlayerDays[date] = detail;
+    byDayStarts[date] = countedStarts;
+    const weekTotal = Math.round(Object.values(byDay).reduce((s, v) => s + v, 0) * 10) / 10;
+    const startsUsed = Object.values(byDayStarts).reduce((s, arr) => s + (arr ? arr.length : 0), 0);
+    weekTotals[t.id] = weekTotal;
+    batch.set(ref, {
+      teamId: t.id, week: week.n, byDay, byPlayerDays, byDayStarts, startsUsed,
+      total: weekTotal, updatedAt: new Date().toISOString(),
+    });
   }
 
   // Live matchup totals.
