@@ -5,8 +5,12 @@
  *   3. recompute positions[] + eligibleSlots per the league eligibility rules
  */
 import { db, leagueRef } from "./firebase.mjs";
+import { CFG } from "./league.mjs";
 import * as MLB from "./mlb.mjs";
 import { computePositions, eligibleSlots, normalizeAppearances } from "./eligibility.mjs";
+
+// Yahoo-style two-way splits: these person ids live as "{id}:B" + "{id}:P".
+const TWO_WAY = new Set((CFG.TWO_WAY_PLAYERS || []).map(String));
 
 export async function syncPlayers(yesterday, season) {
   const L = leagueRef();
@@ -27,6 +31,22 @@ export async function syncPlayers(yesterday, season) {
   // ---- existing player docs ----
   const existing = {};
   (await L.collection("players").get()).forEach((d) => { existing[d.id] = d.data(); });
+
+  // For two-way people, updates accumulate on a merged view of the two split
+  // docs (batting counters from :B, pitching from :P), split back out below.
+  TWO_WAY.forEach((pid) => {
+    if (existing[pid]) return;
+    const b = existing[`${pid}:B`], p = existing[`${pid}:P`];
+    if (!b && !p) return;
+    existing[pid] = {
+      ...(p || {}), ...(b || {}),
+      apprThisSeason: (b || {}).apprThisSeason || {},
+      gsThisSeason: (p || {}).gsThisSeason || 0,
+      reliefThisSeason: (p || {}).reliefThisSeason || 0,
+      pitchedThisSeason: (p || {}).pitchedThisSeason || 0,
+    };
+    delete existing[pid].rosteredBy; // ownership lives on the split docs
+  });
 
   // ---- 2. appearance counters from yesterday's lines ----
   const statSnap = yesterday
@@ -70,9 +90,33 @@ export async function syncPlayers(yesterday, season) {
     u.lastCountedDate = yesterday;
   });
 
+  // ---- split two-way people back into their :B / :P fantasy players ----
+  Object.keys(updates).filter((pid) => TWO_WAY.has(pid)).forEach((pid) => {
+    const u = updates[pid];
+    delete updates[pid];
+    const baseName = String(u.name || "").replace(/ \((Batter|Pitcher)\)$/, "");
+    [["B", "Batter"], ["P", "Pitcher"]].forEach(([role, label]) => {
+      const key = `${pid}:${role}`;
+      const prev = existing[key] || {};
+      updates[key] = {
+        ...prev, ...u,
+        name: `${baseName} (${label})`,
+        personId: +pid, twoWayRole: role,
+        rosteredBy: prev.rosteredBy ?? null, // each half has its own owner
+      };
+    });
+  });
+
   // ---- 3. recompute eligibility ----
   Object.values(updates).forEach((u) => {
     u.positions = computePositions(u);
+    if (u.twoWayRole === "B") {
+      u.positions = u.positions.filter((p) => !["SP", "RP"].includes(p));
+      if (!u.positions.length) u.positions = ["DH"];
+    } else if (u.twoWayRole === "P") {
+      u.positions = u.positions.filter((p) => ["SP", "RP"].includes(p));
+      if (!u.positions.length) u.positions = ["SP"];
+    }
     u.eligibleSlots = eligibleSlots(u.positions);
     u.apprThisSeason = normalizeAppearances(u.apprThisSeason);
     if (u.rosteredBy === undefined) u.rosteredBy = null;

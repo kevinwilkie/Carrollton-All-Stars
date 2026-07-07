@@ -127,8 +127,8 @@ async function saveLineupSlots(slots) {
 async function placeClaim(player, bid, dropId) {
   await L().collection("claims").add({
     teamId: App.myTeamId,
-    add: +player.mlbId, addName: player.name, addPositions: player.positions || [],
-    drop: dropId ? +dropId : null,
+    add: String(player.mlbId), addName: player.name, addPositions: player.positions || [],
+    drop: dropId ? String(dropId) : null,
     bid: Math.round(bid),
     forDate: claimProcessDate(),
     status: "pending",

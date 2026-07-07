@@ -116,7 +116,7 @@ function wireTradeModal() {
     const err = (m) => { const el = $("#trade-error"); el.textContent = m; el.hidden = false; };
     if (!trGives.size && !trGets.size) return err("Pick at least one player on either side.");
     try {
-      await proposeTrade($("#trade-partner").value, [...trGives].map(Number), [...trGets].map(Number));
+      await proposeTrade($("#trade-partner").value, [...trGives], [...trGets]);
       $("#trade-modal").hidden = true;
       toast("Trade proposed.", "success");
     } catch (e2) {

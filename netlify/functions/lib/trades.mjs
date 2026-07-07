@@ -57,14 +57,14 @@ export async function executeTrade(t) {
     delete from.players[id];
     to.players[id] = { ...p, via: "trade" };
     batch.set(L.collection("players").doc(id), { rosteredBy: t.to }, { merge: true });
-    log({ type: "trade", mlbId: +id, name: p.name || "", fromTeam: t.from, toTeam: t.to });
+    log({ type: "trade", mlbId: id, name: p.name || "", fromTeam: t.from, toTeam: t.to });
   });
   gets.forEach((id) => {
     const p = to.players[id];
     delete to.players[id];
     from.players[id] = { ...p, via: "trade" };
     batch.set(L.collection("players").doc(id), { rosteredBy: t.from }, { merge: true });
-    log({ type: "trade", mlbId: +id, name: p.name || "", fromTeam: t.to, toTeam: t.from });
+    log({ type: "trade", mlbId: id, name: p.name || "", fromTeam: t.to, toTeam: t.from });
   });
 
   batch.set(fromRef, { players: from.players, updatedAt: now }, { merge: true });

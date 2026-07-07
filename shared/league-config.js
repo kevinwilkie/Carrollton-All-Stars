@@ -124,6 +124,14 @@
     vetoesNeeded: 6,       // majority of the 10 non-involved owners
   };
 
+  // ---- Two-way players (Yahoo-style split) ------------------------------------
+  // These MLB person ids exist as TWO separate fantasy players: "{id}:B"
+  // (batter — hitter positions, scores only batting) and "{id}:P" (pitcher —
+  // SP/RP, scores only pitching). Different teams may own each half.
+  const TWO_WAY_PLAYERS = [
+    660271, // Shohei Ohtani
+  ];
+
   // ---- Keepers ---------------------------------------------------------------
   const KEEPER = {
     max: 5,                // per team
@@ -138,6 +146,6 @@
     LEAGUE, LEAGUE_TEAMS, COMMISH_EMAILS,
     BUDGET, ROSTER_SIZE, LINEUP_SLOTS, BENCH_SLOTS, IL_SLOTS,
     HITTER_POSITIONS, SLOT_ELIGIBILITY, ELIGIBILITY,
-    SCORING, SEASON_STRUCTURE, FAAB, TRADE, KEEPER,
+    SCORING, SEASON_STRUCTURE, FAAB, TRADE, KEEPER, TWO_WAY_PLAYERS,
   };
 });

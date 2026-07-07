@@ -30,6 +30,7 @@ box scores come from the free MLB Stats API (statsapi.mlb.com).
 - **Waivers:** daily FAAB, $100/season, $1 minimum, processed ~3am ET (ties → worse record)
 - **Trades:** 1-day review; blocked only by 6+ vetoes from the other 10 owners
 - **Keepers:** up to 5 · Y1 = price+$5 ($5 undrafted) · Y2 = ESPN avg salary · max 2 straight years
+- **Two-way players** (Ohtani) split Yahoo-style into separate Batter and Pitcher entries — different teams can own each half (list in `shared/league-config.js` `TWO_WAY_PLAYERS`)
 
 Change a rule → edit `shared/league-config.js` (and `firestore.rules` if owners change).
 

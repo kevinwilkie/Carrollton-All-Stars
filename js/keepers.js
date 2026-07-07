@@ -73,7 +73,7 @@ function renderKeepers() {
       const entries = [...next].map((mlbId) => {
         const p = Object.values(kpRoster.players).find((x) => String(x.mlbId) === mlbId);
         const k = p ? keeperCostOf(p) : { cost: null };
-        return { mlbId: +mlbId, name: p ? p.name : "", price: p ? p.price || 0 : 0, plannedCost: k.cost };
+        return { mlbId, name: p ? p.name : "", price: p ? p.price || 0 : 0, plannedCost: k.cost };
       });
       try {
         await saveKeeperDeclaration(LEAGUE.season + 1, entries);

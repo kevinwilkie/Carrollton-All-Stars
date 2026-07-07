@@ -154,13 +154,22 @@ export async function recomputeScores(date) {
   const week = weekFor(date, settings.weeks);
   if (!week) return null;
 
-  // Points per player for the date.
+  // Stat lines per MLB person for the date. Roster ids may be two-way splits
+  // ("660271:B"/"660271:P") — those score only their half of the person's line.
   const statSnap = await L.collection("statlines").where("date", "==", date).get();
-  const pts = {};
-  statSnap.forEach((d) => { pts[String(d.data().mlbId)] = d.data().points || 0; });
+  const stats = {};
+  statSnap.forEach((d) => { stats[String(d.data().mlbId)] = d.data(); });
+  const pointsFor = (rosterId) => {
+    const [person, role] = String(rosterId).split(":");
+    const line = stats[person];
+    if (!line) return 0;
+    if (role === "B") return Scoring.round1(Scoring.scoreHitting(line.batting));
+    if (role === "P") return Scoring.round1(Scoring.scorePitching(line.pitching));
+    return line.points || 0;
+  };
 
   const dayPoints = {};   // teamId -> points for `date`
-  const dayDetail = {};   // teamId -> { mlbId: {slot, points} }
+  const dayDetail = {};   // teamId -> { rosterId: {slot, points} }
   for (const t of CFG.LEAGUE_TEAMS) {
     const lsnap = await L.collection("lineups").doc(`${t.id}_${date}`).get();
     const locked = lsnap.exists ? lsnap.data().locked || {} : {};
@@ -168,7 +177,7 @@ export async function recomputeScores(date) {
     const detail = {};
     Object.entries(locked).forEach(([mlbId, slot]) => {
       if (!isActiveSlot(slot)) return;
-      const p = pts[mlbId] || 0;
+      const p = pointsFor(mlbId);
       total += p;
       if (p) detail[mlbId] = { slot, points: p };
     });

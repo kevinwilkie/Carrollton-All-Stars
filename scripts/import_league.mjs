@@ -145,24 +145,35 @@ resolved.forEach((pl) => {
     reliefThisSeason: Math.max(0, (s.pitching?.games || 0) - (s.pitching?.gamesStarted || 0)),
     pitchedThisSeason: s.pitching?.games || 0,
   });
-  // Yahoo's split Ohtani: the (Batter) entry keeps hitter positions, the
-  // (Pitcher) entry keeps SP/RP — so lineups slot correctly on both teams.
-  if (pl.roleHint === "batter") pl.positions = pl.positions.filter((p) => !["SP", "RP"].includes(p));
-  if (pl.roleHint === "pitcher") pl.positions = pl.positions.filter((p) => ["SP", "RP"].includes(p));
+  // Yahoo-style split entries become separate fantasy players ("{id}:B" /
+  // "{id}:P"): the Batter half keeps hitter positions and scores only batting,
+  // the Pitcher half keeps SP/RP and scores only pitching.
+  if (pl.roleHint === "batter") {
+    pl.positions = pl.positions.filter((p) => !["SP", "RP"].includes(p));
+    if (!pl.positions.length) pl.positions = ["DH"];
+    pl.docId = `${pl.mlb.id}:B`;
+    pl.displayName = `${pl.mlb.fullName} (Batter)`;
+  } else if (pl.roleHint === "pitcher") {
+    pl.positions = pl.positions.filter((p) => ["SP", "RP"].includes(p));
+    if (!pl.positions.length) pl.positions = ["SP"];
+    pl.docId = `${pl.mlb.id}:P`;
+    pl.displayName = `${pl.mlb.fullName} (Pitcher)`;
+  } else {
+    pl.docId = String(pl.mlb.id);
+    pl.displayName = pl.mlb.fullName;
+  }
   pl.slots = eligibleSlots(pl.positions);
 });
 
-// A player on two rosters (Yahoo batter/pitcher split) breaks our one-owner
-// model in a known, tolerable way — warn loudly.
+// The same fantasy player (same half, for splits) on two rosters is a real
+// conflict — flag it.
 const seenOn = {};
 teams.forEach((t) => t.players.filter((p) => p.mlb).forEach((pl) => {
-  (seenOn[pl.mlb.id] = seenOn[pl.mlb.id] || []).push(t.team.name);
+  (seenOn[pl.docId] = seenOn[pl.docId] || []).push(t.team.name);
 }));
 Object.entries(seenOn).filter(([, on]) => on.length > 1).forEach(([id, on]) => {
-  const nm = resolved.find((p) => String(p.mlb.id) === id)?.mlb.fullName;
-  console.warn(`\n⚠ ${nm} appears on ${on.join(" AND ")} (Yahoo batter/pitcher split).`);
-  console.warn(`  Our scoring credits a player's FULL line (bat + arm) to whichever team`);
-  console.warn(`  starts him — expect his points to differ from Yahoo on those teams.`);
+  const nm = resolved.find((p) => p.docId === id)?.displayName;
+  console.warn(`⚠ ${nm} appears on ${on.join(" AND ")} — the last team written wins; fix the paste.`);
 });
 
 if (!flag("write")) {
@@ -180,13 +191,15 @@ const batch = db().batch();
 teams.forEach((t) => {
   const players = {};
   t.players.filter((p) => p.mlb).forEach((pl) => {
-    players[String(pl.mlb.id)] = {
-      mlbId: pl.mlb.id, name: pl.mlb.fullName,
+    players[pl.docId] = {
+      mlbId: pl.docId, name: pl.displayName,
       mlbTeam: abbrOf[pl.mlb.currentTeam?.id] || "",
       positions: pl.positions, via: "import", price: 0,
     };
-    batch.set(L.collection("players").doc(String(pl.mlb.id)), {
-      name: pl.mlb.fullName,
+    batch.set(L.collection("players").doc(pl.docId), {
+      name: pl.displayName,
+      personId: pl.mlb.id,
+      ...(pl.roleHint ? { twoWayRole: pl.roleHint === "pitcher" ? "P" : "B" } : {}),
       mlbTeamId: pl.mlb.currentTeam?.id || null,
       mlbTeam: abbrOf[pl.mlb.currentTeam?.id] || "",
       primary: pl.mlb.primaryPosition?.abbreviation || "",

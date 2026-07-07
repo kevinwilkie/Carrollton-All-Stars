@@ -87,7 +87,8 @@ const PLAYERS = [
   { id: 690953, name: "Logan O'Hoppe", team: "LAA", positions: ["C"], rank: 132 },
   { id: 681351, name: "Reid Detmers", team: "LAA", positions: ["SP", "RP"], rank: 240 },
   // ---- Los Angeles Dodgers (LAD) ----
-  { id: 660271, name: "Shohei Ohtani", team: "LAD", positions: ["DH", "SP"], rank: 1 },
+  { id: "660271:B", name: "Shohei Ohtani (Batter)", team: "LAD", positions: ["DH"], rank: 1 },
+  { id: "660271:P", name: "Shohei Ohtani (Pitcher)", team: "LAD", positions: ["SP"], rank: 30 },
   { id: 605141, name: "Mookie Betts", team: "LAD", positions: ["SS", "OF"], rank: 14 },
   { id: 518692, name: "Freddie Freeman", team: "LAD", positions: ["1B"], rank: 30 },
   { id: 669257, name: "Will Smith", team: "LAD", positions: ["C"], rank: 64 },

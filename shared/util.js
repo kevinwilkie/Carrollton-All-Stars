@@ -60,8 +60,10 @@ function toast(msg, kind) {
 
 // ---- Avatars -----------------------------------------------------------------
 // MLB headshots are keyed by mlbId — no scraping needed (unlike the NFL apps).
+// Two-way split ids like "660271:B" resolve to the person's numeric id.
 function headshotUrl(mlbId, size) {
-  return `https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/w_${size || 120},q_auto:best/v1/people/${mlbId}/headshot/67/current`;
+  const person = (String(mlbId).match(/^\d+/) || [""])[0];
+  return `https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/w_${size || 120},q_auto:best/v1/people/${person}/headshot/67/current`;
 }
 function initialsOf(name) {
   const w = String(name || "").replace(/[^A-Za-z .'-]/g, "").split(/\s+/).filter(Boolean);

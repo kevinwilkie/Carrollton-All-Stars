@@ -12,8 +12,13 @@
  */
 import { writeFileSync } from "node:fs";
 import Scoring from "../shared/scoring.js";
+import cfg from "../shared/league-config.js";
 import * as MLB from "../netlify/functions/lib/mlb.mjs";
 import { computePositions } from "../netlify/functions/lib/eligibility.mjs";
+
+// Two-way players are drafted as TWO entries (Yahoo-style): "{id}:B" bats,
+// "{id}:P" pitches — each ranked by its half's fantasy points.
+const TWO_WAY = new Set((cfg.TWO_WAY_PLAYERS || []).map(String));
 
 const arg = (name, dflt) => {
   const i = process.argv.indexOf("--" + name);
@@ -72,7 +77,7 @@ async function main() {
   console.log();
 
   // Eligibility + fantasy-point ranking.
-  const pool = players.map((p) => {
+  const pool = players.flatMap((p) => {
     const s = statsById[p.mlbId] || { fielding: {}, pitching: null, primary: p.position };
     const positions = computePositions({
       primary: s.primary || p.position,
@@ -84,17 +89,26 @@ async function main() {
     });
     // Season totals under our scoring (QS unavailable in season lines —
     // ranking only, so approximate with half the starts as quality).
-    let pts = 0;
-    if (s.hitLine) pts += Scoring.scoreHitting(s.hitLine);
-    if (s.pitchLine) {
-      pts += Scoring.scorePitching({ ...s.pitchLine, gamesStarted: 0 });
-      pts += (s.pitching?.gamesStarted || 0) * 0.5 * 5; // QS estimate
-    }
-    return {
-      id: p.mlbId, name: p.name, team: abbrOf[p.teamId] || "",
-      positions, points: Math.round(pts),
+    const hitPts = s.hitLine ? Scoring.scoreHitting(s.hitLine) : 0;
+    const pitchPts = s.pitchLine
+      ? Scoring.scorePitching({ ...s.pitchLine, gamesStarted: 0 }) +
+        (s.pitching?.gamesStarted || 0) * 0.5 * 5 // QS estimate
+      : 0;
+    const base = {
+      team: abbrOf[p.teamId] || "",
       il: p.statusCode && /^D/i.test(p.statusCode),
     };
+    if (TWO_WAY.has(String(p.mlbId))) {
+      const hitPos = positions.filter((x) => !["SP", "RP"].includes(x));
+      const armPos = positions.filter((x) => ["SP", "RP"].includes(x));
+      return [
+        { ...base, id: `${p.mlbId}:B`, name: `${p.name} (Batter)`,
+          positions: hitPos.length ? hitPos : ["DH"], points: Math.round(hitPts) },
+        { ...base, id: `${p.mlbId}:P`, name: `${p.name} (Pitcher)`,
+          positions: armPos.length ? armPos : ["SP"], points: Math.round(pitchPts) },
+      ];
+    }
+    return [{ ...base, id: p.mlbId, name: p.name, positions, points: Math.round(hitPts + pitchPts) }];
   });
 
   pool.sort((a, b) => b.points - a.points);
@@ -106,7 +120,7 @@ async function main() {
   let lastTeam = "";
   top.forEach((p) => {
     if (p.team !== lastTeam) { lines.push(`  // ---- ${p.team} ----`); lastTeam = p.team; }
-    lines.push(`  { id: ${p.id}, name: ${JSON.stringify(p.name)}, team: ${JSON.stringify(p.team)}, ` +
+    lines.push(`  { id: ${JSON.stringify(p.id)}, name: ${JSON.stringify(p.name)}, team: ${JSON.stringify(p.team)}, ` +
       `positions: ${JSON.stringify(p.positions)}, rank: ${p.rank} },`);
   });
 

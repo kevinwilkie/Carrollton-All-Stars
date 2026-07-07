@@ -64,10 +64,10 @@ export async function processClaims(today) {
       delete roster.players[dropId];
       delete rosteredBy[dropId];
       batch.set(L.collection("players").doc(dropId), { rosteredBy: null }, { merge: true });
-      log({ type: "drop", teamId: c.teamId, mlbId: +dropId, name: dropped?.name || "", via: "waivers" });
+      log({ type: "drop", teamId: c.teamId, mlbId: dropId, name: dropped?.name || "", via: "waivers" });
     }
     roster.players[addId] = {
-      mlbId: +addId, name: c.addName || "", positions: c.addPositions || [],
+      mlbId: addId, name: c.addName || "", positions: c.addPositions || [],
       via: "faab", price: c.bid,
     };
     rosteredBy[addId] = c.teamId;
@@ -77,7 +77,7 @@ export async function processClaims(today) {
     batch.set(L.collection("teams").doc(c.teamId), { faabRemaining: team.faabRemaining }, { merge: true });
     batch.set(L.collection("players").doc(addId), { rosteredBy: c.teamId }, { merge: true });
     batch.set(ref, { status: "won", resolvedNote: `Won for $${c.bid}.`, resolvedAt: now }, { merge: true });
-    log({ type: "add", teamId: c.teamId, mlbId: +addId, name: c.addName || "", via: "faab", bid: c.bid });
+    log({ type: "add", teamId: c.teamId, mlbId: addId, name: c.addName || "", via: "faab", bid: c.bid });
     processed++;
   }
 
