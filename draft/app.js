@@ -1781,6 +1781,7 @@
   function init() {
     const actions = document.querySelector(".topbar-actions");
     wireThemeButton($("#btn-theme"));
+    trackHeaderHeight();
 
     // "Undo last" button next to the export/import controls.
     const undoBtn = document.createElement("button");

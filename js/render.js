@@ -88,6 +88,7 @@ function applyRole() {
 
 document.addEventListener("DOMContentLoaded", () => {
   wireThemeButton($("#btn-theme"));
+  trackHeaderHeight();
   $$(".tab").forEach((b) => b.addEventListener("click", () => setTab(b.dataset.tab)));
   $("#btn-auth").addEventListener("click", () => {
     if (Auth.user) signOutUser(); else signInGoogle();

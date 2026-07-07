@@ -48,13 +48,25 @@
   letter-spacing: .5px; color: var(--muted); text-transform: uppercase;
 }
 .lu-player { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; cursor: pointer; }
-.lu-name { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.lu-meta { font-size: 11px; color: var(--muted); white-space: nowrap; }
+/* the name/badges column must shrink and clip — never slide under the time/pts columns */
+.lu-stack { flex: 1; min-width: 0; overflow: hidden; }
+.lu-name { display: block; font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lu-meta { display: block; font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lu-time { font-size: 11px; color: var(--muted); white-space: nowrap; flex: 0 0 auto; }
 .lu-pts { font-weight: 800; min-width: 44px; text-align: right; }
 .lu-lock { font-size: 13px; min-width: 20px; text-align: center; }
 .lu-empty { color: var(--muted); font-style: italic; font-size: 13px; flex: 1; cursor: pointer; }
 .divider-thin { border-top: 1px dashed var(--line); margin: 8px 0; }
 .il-flag { color: var(--warn); font-size: 11px; font-weight: 700; }
+
+/* Phones: tighten the fixed columns so the name/badges get the room */
+@media (max-width: 560px) {
+  .lu-row { gap: 7px; padding: 6px 8px; }
+  .lu-slot { min-width: 32px; }
+  .lu-time { font-size: 10px; }
+  .lu-pts { min-width: 26px; font-size: 14px; }
+  .lu-lock { min-width: 15px; }
+}
 
 /* ---------------- Matchup / Scoreboard ---------------- */
 .mu-card { display: flex; flex-direction: column; gap: 8px; }

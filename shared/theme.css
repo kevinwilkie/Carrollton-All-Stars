@@ -79,6 +79,12 @@ html[data-theme="vintage"] {
 }
 html[data-theme="vintage"] .tabs { background: rgba(239,228,205,.93); }
 html[data-theme="vintage"] .toast { color: var(--text); }
+/* status pills/badges hardcode pale text for the dark theme — go full-color on cream */
+html[data-theme="vintage"] .pill-live, html[data-theme="vintage"] .role-badge.role-commish { color: var(--good); }
+html[data-theme="vintage"] .pill-bad  { color: var(--bad); }
+html[data-theme="vintage"] .pill-warn { color: var(--warn); }
+html[data-theme="vintage"] .role-badge.role-owner,
+html[data-theme="vintage"] .role-badge.role-viewer { color: #2f4a86; }
 
 * { box-sizing: border-box; }
 
@@ -120,7 +126,11 @@ a { color: var(--accent); }
 .brand-badge img {
   width: 100%; height: 100%; object-fit: contain; display: block;
 }
-.brand-text h1 { font-size: 18px; letter-spacing: .3px; color: var(--brand-fg); white-space: nowrap; }
+.brand-text { min-width: 0; }
+.brand-text h1 {
+  font-size: 18px; letter-spacing: .3px; color: var(--brand-fg);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 .brand-text .tagline {
   display: block; font-size: 11px; font-weight: 700; letter-spacing: 1.2px;
   text-transform: uppercase; color: var(--brand-sub);
@@ -333,6 +343,19 @@ label { font-size: 13px; color: var(--muted); font-weight: 600; }
 .scroll-x::-webkit-scrollbar-thumb { background: var(--line); border-radius: 8px; }
 
 /* ---------------- Mobile ---------------- */
+/* The topbar can't fit brand + actions side by side on a phone: stack them as
+   two rows, with the actions row scrolling sideways instead of wrapping over
+   the title. (JS keeps --header-h in sync so the sticky tabs sit below.) */
+@media (max-width: 700px) {
+  .topbar { flex-wrap: wrap; padding: 8px 12px; row-gap: 2px; }
+  .brand { flex: 1 1 100%; }
+  .topbar-actions {
+    flex: 1 1 100%; flex-wrap: nowrap; justify-content: flex-start;
+    overflow-x: auto; padding: 4px 0 2px; scrollbar-width: none;
+  }
+  .topbar-actions::-webkit-scrollbar { display: none; }
+}
+
 @media (max-width: 560px) {
   .modal-overlay { align-items: flex-end; padding: 0; }
   .modal {

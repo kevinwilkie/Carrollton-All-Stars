@@ -63,6 +63,19 @@ function wireThemeButton(btn) {
   });
 }
 
+// ---- Sticky offsets ------------------------------------------------------------
+// The tabs bar sticks below the topbar via top: var(--header-h). The topbar
+// wraps to two rows on phones, so measure it rather than hardcoding a height.
+function trackHeaderHeight() {
+  const bar = document.querySelector(".topbar");
+  if (!bar) return;
+  const set = () =>
+    document.documentElement.style.setProperty("--header-h", bar.offsetHeight + "px");
+  if (window.ResizeObserver) new ResizeObserver(set).observe(bar);
+  else window.addEventListener("resize", set);
+  set();
+}
+
 // ---- Toast -------------------------------------------------------------------
 let _toastTimer = null;
 function toast(msg, kind) {

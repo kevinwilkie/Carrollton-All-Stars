@@ -117,11 +117,11 @@ function renderMyTeam() {
     return `<div class="lu-row${cls}${selCls}${droppable}" data-slot="${slotKey}">` +
       `<span class="lu-slot">${slotKey}</span>` +
       `<span class="lu-player" data-slot="${slotKey}">${avatarHTML(p, 28)}` +
-      `<span><span class="lu-name">${escapeHtml(p.name)}</span>` +
-      `<span class="lu-meta"> ${posBadges(p.positions, "sm")} ${escapeHtml(p.mlbTeam || "")}` +
+      `<span class="lu-stack"><span class="lu-name">${escapeHtml(p.name)}</span>` +
+      `<span class="lu-meta">${posBadges(p.positions, "sm")} ${escapeHtml(p.mlbTeam || "")}` +
       `${playerOf(id) && playerOf(id).ilStatus ? ` <span class="il-flag">${escapeHtml(playerOf(id).ilStatus)}</span>` : ""}` +
       `${ilBad ? ` <span class="il-flag">⚠ not on MLB IL</span>` : ""}</span></span></span>` +
-      `<span class="lu-meta">${g ? (g.status === "Final" ? "Final" : g.firstPitchUTC ? fmtTimeET(g.firstPitchUTC) : "") : "no game"}</span>` +
+      `<span class="lu-time">${g ? (g.status === "Final" ? "Final" : g.firstPitchUTC ? fmtTimeET(g.firstPitchUTC) : "") : "no game"}</span>` +
       `<span class="lu-pts">${pts != null ? pts : "—"}</span>` +
       `<span class="lu-lock">${locked ? "🔒" : ""}</span></div>`;
   };
