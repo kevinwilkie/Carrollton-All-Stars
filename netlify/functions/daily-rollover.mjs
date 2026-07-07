@@ -12,11 +12,20 @@ import { processClaims, expireStaleClaims } from "./lib/waivers.mjs";
 import { syncPlayers } from "./lib/players-sync.mjs";
 import { ensureLineups } from "./lib/lineups.mjs";
 import { etDate, addDays, CFG } from "./lib/league.mjs";
+import { leagueRef } from "./lib/firebase.mjs";
 
 export default async () => {
   const today = etDate();
   const yesterday = addDays(today, -1);
   const out = { today };
+
+  // The active season comes from Firestore config (falls back to the code
+  // default) so a test season can run against the current MLB year.
+  let season = CFG.LEAGUE.season;
+  try {
+    const s = (await leagueRef().collection("config").doc("settings").get()).data();
+    if (s && s.season) season = s.season;
+  } catch (e) { /* keep default */ }
 
   const step = async (name, fn) => {
     try { out[name] = await fn(); }
@@ -27,7 +36,7 @@ export default async () => {
   await step("weekFinalized", () => finalizeWeekIfEnded(yesterday));
   await step("waivers", () => processClaims(today));
   await step("expiredClaims", () => expireStaleClaims(today));
-  await step("playersSynced", () => syncPlayers(yesterday, CFG.LEAGUE.season));
+  await step("playersSynced", () => syncPlayers(yesterday, season));
   await step("todaysGames", async () => (await ensureMlbDay(today, { refresh: true })).length);
   await step("lineupsCreated", () => ensureLineups(today));
 

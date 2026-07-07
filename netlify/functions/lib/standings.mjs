@@ -58,12 +58,14 @@ export async function finalizeWeekIfEnded(yesterday) {
     });
   seeded.forEach((t, i) => batch.set(L.collection("teams").doc(t.id), { seed: i + 1 }, { merge: true }));
 
-  // Playoff bracket advancement.
-  const S = CFG.SEASON_STRUCTURE;
+  // Playoff bracket advancement. The last regular week comes from the
+  // configured week map (a shortened test season still gets playoffs).
   const seedOf = Object.fromEntries(seeded.map((t, i) => [t.id, i + 1]));
   const wk = (n) => L.collection("schedule").doc(String(n));
+  const lastRegular = Math.max(0, ...(settings.weeks || [])
+    .filter((w) => w.type !== "playoff").map((w) => w.n));
 
-  if (week.type !== "playoff" && week.n === S.regularWeeks) {
+  if (week.type !== "playoff" && week.n === lastRegular) {
     // Regular season over → quarterfinals: 3v6, 4v5 (1–2 byes).
     const byId = seeded.map((t) => t.id);
     batch.set(wk(week.n + 1), {
