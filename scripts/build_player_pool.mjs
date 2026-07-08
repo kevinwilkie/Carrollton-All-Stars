@@ -24,7 +24,9 @@ const arg = (name, dflt) => {
   const i = process.argv.indexOf("--" + name);
   return i > -1 ? process.argv[i + 1] : dflt;
 };
-const SEASON = +arg("season", new Date().getFullYear());
+// Default to the LAST COMPLETED season (the draft is next spring, so the target
+// season has no stats yet). Override with --season for a mid-year test build.
+const SEASON = +arg("season", cfg.LEAGUE.season - 1);
 const OUT = arg("out", "draft/data/players.js");
 const TOP = +arg("top", 700);
 

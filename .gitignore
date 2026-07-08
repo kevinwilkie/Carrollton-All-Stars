@@ -3,4 +3,5 @@ node_modules/
 .env
 .env.*
 *service-account*.json
+backups/
 .DS_Store

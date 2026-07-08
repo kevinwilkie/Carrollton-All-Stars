@@ -96,14 +96,29 @@ The nightly stats/waivers/trades jobs run on Netlify and need admin access to Fi
 
 ## Draft day (March)
 
-- Player pool: a week or so before, run `node scripts/build_player_pool.mjs` and commit
-  the refreshed `draft/data/players.js` (see that file's header), or ask Claude to.
-- Keepers: enter each team's keepers on the draft board's **Keepers** tab before the
-  draft (prices auto-check Year 1/Year 2 rules; Year 2 pulls ESPN average salary).
-- Draft night: open `/draft/` on the big screen (📺 TV Mode), sign in, draft. Owners
-  can watch live from any device — share the plain URL.
+**A week or so before** — run these once, in order:
+
+1. **Player pool** — `node scripts/build_player_pool.mjs` (no flag needed: it defaults to
+   last completed season, e.g. 2026 for a 2027 draft). Commit the refreshed
+   `draft/data/players.js`, or ask Claude to.
+2. **Seed + schedule** — in the season app **Admin** tab: *Seed teams* (writes teams +
+   the owner allowlist), *Build week map* → *Save*, then *Generate schedule*.
+3. **Owner emails** — make sure every real owner email is in `shared/league-config.js`
+   and you've re-run *Seed teams* (step 3 of setup), so they can all sign in.
+
+**Draft night:**
+
+- Enter each team's keepers on the draft board's **Keepers** tab (prices auto-check the
+  Year 1 / Year 2 rules; Year 2 pulls ESPN average salary).
+- Open `/draft/` on the big screen (📺 TV Mode), sign in, draft. Owners watch live from
+  any device — share the plain URL.
 - After the final pick: **Publish to League** (top bar) copies every roster into the
   season app, charges the auction prices, and sets everyone's $100 FAAB.
+
+**Backups** — the free Firebase tier has no automatic export. Before draft night and now
+and then during the season, run `node scripts/export_firestore.mjs` (needs the same
+`FIREBASE_SERVICE_ACCOUNT_B64` env var) to dump every collection to a timestamped JSON
+file you can keep.
 
 ## Every season
 
