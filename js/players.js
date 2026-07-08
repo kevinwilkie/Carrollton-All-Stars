@@ -20,38 +20,7 @@ function renderPlayers() {
   const seg = POS.map((p) =>
     `<button class="segbtn${plFilter.pos === p ? " on" : ""}" data-pos="${p}">${p === "ALL" ? "All" : p}</button>`).join("");
 
-  let list = App.playersArr;
-  if (plFilter.avail === "available") list = list.filter((p) => !p.rosteredBy);
-  if (plFilter.avail === "rostered") list = list.filter((p) => p.rosteredBy);
-  if (plFilter.pos !== "ALL") list = list.filter((p) => (p.positions || []).includes(plFilter.pos));
-  const q = plFilter.q.trim().toLowerCase();
-  if (q) list = list.filter((p) => (p.name || "").toLowerCase().includes(q));
-  // Best fantasy producers first — the useful order for waiver decisions.
-  list = list.slice().sort((a, b) =>
-    (b.seasonPoints || 0) - (a.seasonPoints || 0) || (a.name || "").localeCompare(b.name || ""));
-  const total = list.length;
-  const CAP = 300;
-  list = list.slice(0, CAP);
-
   const faab = (App.teams[App.myTeamId] || {}).faabRemaining;
-  const rows = list.map((p) => {
-    const owned = p.rosteredBy;
-    const sp = p.seasonPoints;
-    return `<div class="row">` +
-      `<span class="grow pl-tap" data-card="${p.mlbId}" style="display:flex;align-items:center;gap:10px;cursor:pointer;min-width:0">` +
-      `${avatarHTML(p, 30)}<span style="min-width:0"><span class="pl-name">${escapeHtml(p.name)}</span>` +
-      `<span class="sub pl-badges">${posBadges(p.positions, "sm")} ${escapeHtml(p.mlbTeam || "")}` +
-      `${p.ilStatus ? ` <span class="pl-il">${escapeHtml(p.ilStatus)}</span>` : ""}</span></span></span>` +
-      `<span class="val" title="Season fantasy points">${sp != null ? sp : "—"}</span>` +
-      (owned
-        ? `<span class="pl-owner">${escapeHtml(teamName(owned))}</span>`
-        : App.myTeamId
-          ? `<button class="btn btn-small" data-claim="${p.mlbId}">+ Claim</button>`
-          : "") +
-      `</div>`;
-  }).join("") || `<div class="empty-note">No players match.</div>`;
-  const moreNote = total > CAP
-    ? `<div class="empty-note">Showing the top ${CAP} of ${total} by season points — search to narrow.</div>` : "";
 
   const myClaims = App.claims.filter((c) => c.status === "pending");
   const claimRows = myClaims.map((c) =>
@@ -76,25 +45,77 @@ function renderPlayers() {
     ["available", "all", "rostered"].map((a) =>
       `<button class="segbtn${plFilter.avail === a ? " on" : ""}" data-avail="${a}">${a[0].toUpperCase() + a.slice(1)}</button>`).join("") +
     `</span></div>` +
-    `<div class="card player-list">${rows}</div>${moreNote}` +
+    `<div id="pl-results">${playersListHTML()}</div>` +
     (myClaims.length || resolved.length
       ? `<div class="card claims-pending"><h3>My waiver claims</h3>${claimRows}${resolvedRows}</div>` : "");
 
+  // Typing must NOT re-render the whole tab — that recreates #pl-search and
+  // drops focus after a single character. Refresh only the results list.
   const search = $("#pl-search");
-  search.addEventListener("input", () => { plFilter.q = search.value; renderPlayers(); });
+  search.addEventListener("input", () => { plFilter.q = search.value; refreshPlayerList(); });
   host.querySelectorAll("[data-pos]").forEach((b) =>
     b.addEventListener("click", () => { plFilter.pos = b.dataset.pos; renderPlayers(); }));
   host.querySelectorAll("[data-avail]").forEach((b) =>
     b.addEventListener("click", () => { plFilter.avail = b.dataset.avail; renderPlayers(); }));
-  host.querySelectorAll("[data-card]").forEach((b) =>
-    b.addEventListener("click", () => openPlayerCard(b.dataset.card)));
-  host.querySelectorAll("[data-claim]").forEach((b) =>
-    b.addEventListener("click", () => openClaim(b.dataset.claim)));
+  wirePlayerResultButtons($("#pl-results"));
   host.querySelectorAll("[data-cancel]").forEach((b) =>
     b.addEventListener("click", async () => {
       try { await cancelClaim(b.dataset.cancel); toast("Claim cancelled.", "success"); }
       catch (e) { toast("Couldn't cancel: " + (e.message || ""), "error"); }
     }));
+}
+
+// Filter + sort the pool by the current filters. Best fantasy producers first —
+// the useful order for waiver decisions.
+function playersFiltered() {
+  let list = App.playersArr;
+  if (plFilter.avail === "available") list = list.filter((p) => !p.rosteredBy);
+  if (plFilter.avail === "rostered") list = list.filter((p) => p.rosteredBy);
+  if (plFilter.pos !== "ALL") list = list.filter((p) => (p.positions || []).includes(plFilter.pos));
+  const q = plFilter.q.trim().toLowerCase();
+  if (q) list = list.filter((p) => (p.name || "").toLowerCase().includes(q));
+  return list.slice().sort((a, b) =>
+    (b.seasonPoints || 0) - (a.seasonPoints || 0) || (a.name || "").localeCompare(b.name || ""));
+}
+
+// Just the results card (+ "showing top N" note) — rebuilt on every keystroke.
+function playersListHTML() {
+  const CAP = 300;
+  const all = playersFiltered();
+  const total = all.length;
+  const rows = all.slice(0, CAP).map((p) => {
+    const owned = p.rosteredBy;
+    const sp = p.seasonPoints;
+    return `<div class="row">` +
+      `<span class="grow pl-tap" data-card="${p.mlbId}" style="display:flex;align-items:center;gap:10px;cursor:pointer;min-width:0">` +
+      `${avatarHTML(p, 30)}<span style="min-width:0"><span class="pl-name">${escapeHtml(p.name)}</span>` +
+      `<span class="sub pl-badges">${posBadges(p.positions, "sm")} ${escapeHtml(p.mlbTeam || "")}` +
+      `${p.ilStatus ? ` <span class="pl-il">${escapeHtml(p.ilStatus)}</span>` : ""}</span></span></span>` +
+      `<span class="val" title="Season fantasy points">${sp != null ? sp : "—"}</span>` +
+      (owned
+        ? `<span class="pl-owner">${escapeHtml(teamName(owned))}</span>`
+        : App.myTeamId
+          ? `<button class="btn btn-small" data-claim="${p.mlbId}">+ Claim</button>`
+          : "") +
+      `</div>`;
+  }).join("") || `<div class="empty-note">No players match.</div>`;
+  const moreNote = total > CAP
+    ? `<div class="empty-note">Showing the top ${CAP} of ${total} by season points — search to narrow.</div>` : "";
+  return `<div class="card player-list">${rows}</div>${moreNote}`;
+}
+
+function refreshPlayerList() {
+  const c = $("#pl-results");
+  if (!c) return;
+  c.innerHTML = playersListHTML();
+  wirePlayerResultButtons(c);
+}
+
+function wirePlayerResultButtons(scope) {
+  scope.querySelectorAll("[data-card]").forEach((b) =>
+    b.addEventListener("click", () => openPlayerCard(b.dataset.card)));
+  scope.querySelectorAll("[data-claim]").forEach((b) =>
+    b.addEventListener("click", () => openClaim(b.dataset.claim)));
 }
 
 function dropNameOf(mlbId) {

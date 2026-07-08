@@ -37,18 +37,27 @@ export async function processClaims(today) {
     (b.bid || 0) - (a.bid || 0) ||
     worseRecordFirst(teams[a.teamId] || {}, teams[b.teamId] || {}));
 
-  const batch = db().batch();
+  // A single won claim emits up to ~7 writes (roster, team FAAB, player add +
+  // drop, claim result, add/drop logs). Firestore caps a batch at 500 ops, so
+  // on a busy waiver morning one giant batch would throw and roll back the
+  // ENTIRE day. Accumulate ops and flush between claims (never mid-claim, so
+  // each claim stays atomic) to stay under the cap.
+  let batch = db().batch();
+  let ops = 0;
   const now = new Date().toISOString();
+  const setOp = (ref, data, opts) => { opts ? batch.set(ref, data, opts) : batch.set(ref, data); ops++; };
+  const flush = async () => { if (ops) { await batch.commit(); batch = db().batch(); ops = 0; } };
   const log = (entry) =>
-    batch.set(L.collection("transactions").doc(), { ...entry, at: now });
+    setOp(L.collection("transactions").doc(), { ...entry, at: now });
 
   let processed = 0;
   for (const c of due) {
+    if (ops >= 440) await flush();   // headroom for this claim's ~7 writes
     const ref = L.collection("claims").doc(c.id);
     const addId = String(c.add);
     const team = teams[c.teamId];
     const roster = rosters[c.teamId];
-    const fail = (note) => batch.set(ref, { status: "lost", resolvedNote: note, resolvedAt: now }, { merge: true });
+    const fail = (note) => setOp(ref, { status: "lost", resolvedNote: note, resolvedAt: now }, { merge: true });
 
     if (!team || !roster) { fail("Team not found."); continue; }
     if (rosteredBy[addId]) { fail(`Already claimed by ${teams[rosteredBy[addId]]?.name || "another team"}.`); continue; }
@@ -63,7 +72,7 @@ export async function processClaims(today) {
       const dropped = roster.players[dropId];
       delete roster.players[dropId];
       delete rosteredBy[dropId];
-      batch.set(L.collection("players").doc(dropId), { rosteredBy: null }, { merge: true });
+      setOp(L.collection("players").doc(dropId), { rosteredBy: null }, { merge: true });
       log({ type: "drop", teamId: c.teamId, mlbId: dropId, name: dropped?.name || "", via: "waivers" });
     }
     roster.players[addId] = {
@@ -73,15 +82,15 @@ export async function processClaims(today) {
     rosteredBy[addId] = c.teamId;
     team.faabRemaining = (team.faabRemaining ?? CFG.FAAB.budget) - c.bid;
 
-    batch.set(L.collection("rosters").doc(c.teamId), { players: roster.players, updatedAt: now }, { merge: true });
-    batch.set(L.collection("teams").doc(c.teamId), { faabRemaining: team.faabRemaining }, { merge: true });
-    batch.set(L.collection("players").doc(addId), { rosteredBy: c.teamId }, { merge: true });
-    batch.set(ref, { status: "won", resolvedNote: `Won for $${c.bid}.`, resolvedAt: now }, { merge: true });
+    setOp(L.collection("rosters").doc(c.teamId), { players: roster.players, updatedAt: now }, { merge: true });
+    setOp(L.collection("teams").doc(c.teamId), { faabRemaining: team.faabRemaining }, { merge: true });
+    setOp(L.collection("players").doc(addId), { rosteredBy: c.teamId }, { merge: true });
+    setOp(ref, { status: "won", resolvedNote: `Won for $${c.bid}.`, resolvedAt: now }, { merge: true });
     log({ type: "add", teamId: c.teamId, mlbId: addId, name: c.addName || "", via: "faab", bid: c.bid });
     processed++;
   }
 
-  await batch.commit();
+  await flush();
   return { processed, considered: due.length };
 }
 
@@ -89,15 +98,17 @@ export async function processClaims(today) {
 export async function expireStaleClaims(today) {
   const L = leagueRef();
   const snap = await L.collection("claims").where("status", "==", "pending").get();
-  const batch = db().batch();
-  let n = 0;
-  snap.forEach((d) => {
+  const now = new Date().toISOString();
+  let batch = db().batch();
+  let ops = 0, n = 0;
+  for (const d of snap.docs) {
     const c = d.data();
     if ((c.forDate || today) < today) {
-      batch.set(d.ref, { status: "expired", resolvedAt: new Date().toISOString() }, { merge: true });
+      batch.set(d.ref, { status: "expired", resolvedAt: now }, { merge: true });
       n++;
+      if (++ops >= 450) { await batch.commit(); batch = db().batch(); ops = 0; }
     }
-  });
-  if (n) await batch.commit();
+  }
+  if (ops) await batch.commit();
   return n;
 }

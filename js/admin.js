@@ -15,6 +15,7 @@ function renderAdmin() {
   if (!App.fs) return host.innerHTML = setupNotice();
 
   const weeks = (App.settings && App.settings.weeks) || [];
+  const season = activeSeason();
   host.innerHTML =
     `<div class="view-head"><h2>Commissioner Tools</h2></div>` +
     `<div class="admin-grid">` +
@@ -31,8 +32,13 @@ function renderAdmin() {
     `<button class="btn btn-ghost" id="ad-seed">Full seed</button></div>` +
 
     `<div class="card"><h3>2 · Week map</h3>` +
-    `<p class="hint">${weeks.length ? `${weeks.length} weeks configured (${weeks[0].start} → ${weeks[weeks.length - 1].end}).`
-      : "No weeks yet."} Build from the MLB ${LEAGUE.season} calendar, review the JSON, then save.</p>` +
+    `<p class="hint"><b>MLB data year</b> — the season the nightly jobs pull rosters, stats, ` +
+    `and the week calendar from. Defaults to ${LEAGUE.season}; set it to the current MLB year to run a ` +
+    `live test (e.g. 2026). Every job reads this, and admin actions preserve it.</p>` +
+    `<input type="number" id="ad-season" value="${season}" min="2020" max="2099" style="width:100px" />` +
+    `<button class="btn btn-small" id="ad-save-season" style="margin-left:6px">Set data year</button>` +
+    `<p class="hint" style="margin-top:12px">${weeks.length ? `${weeks.length} weeks configured (${weeks[0].start} → ${weeks[weeks.length - 1].end}).`
+      : "No weeks yet."} Build from the MLB ${season} calendar, review the JSON, then save.</p>` +
     `<button class="btn btn-ghost" id="ad-build-weeks">Build from MLB calendar</button>` +
     `<textarea id="ad-weeks" rows="6" style="width:100%;margin-top:8px;font-family:monospace;font-size:11px">${escapeHtml(JSON.stringify(weeks, null, 1))}</textarea>` +
     `<div id="ad-weeks-notes" class="hint"></div>` +
@@ -66,12 +72,32 @@ function renderAdmin() {
 
   $("#ad-sync-owners").addEventListener("click", adminSyncOwners);
   $("#ad-seed").addEventListener("click", adminSeed);
+  $("#ad-save-season").addEventListener("click", adminSaveSeason);
   $("#ad-build-weeks").addEventListener("click", adminBuildWeeks);
   $("#ad-save-weeks").addEventListener("click", adminSaveWeeks);
   $("#ad-gen-schedule").addEventListener("click", adminGenSchedule);
   $("#ad-faab-save").addEventListener("click", adminSetFaab);
   host.querySelectorAll("[data-force]").forEach((b) => b.addEventListener("click", () => adminTrade(b.dataset.force, "executed")));
   host.querySelectorAll("[data-kill]").forEach((b) => b.addEventListener("click", () => adminTrade(b.dataset.kill, "vetoed")));
+}
+
+// The active MLB data year. Every scheduled job reads config/settings.season
+// (falling back to LEAGUE.season); the season app mirrors it into App.settings.
+// Admin writers must PRESERVE this — never restamp LEAGUE.season over a live
+// test-season override — so they read it through here.
+function activeSeason() {
+  return (App.settings && App.settings.season) || LEAGUE.season;
+}
+
+// Set the MLB data year independently of the code's LEAGUE.season, so a live
+// test can run against the current MLB year without editing Firestore by hand.
+async function adminSaveSeason() {
+  const yr = parseInt($("#ad-season").value, 10);
+  if (!Number.isInteger(yr) || yr < 2020 || yr > 2099) return toast("Enter a valid year.", "error");
+  try {
+    await L().collection("config").doc("settings").set({ season: yr }, { merge: true });
+    toast(`MLB data year set to ${yr}. Rebuild the week map and re-run the nightly jobs.`, "success");
+  } catch (e) { toast("Failed: " + e.message, "error"); }
 }
 
 // Non-destructive: writes ONLY each team's ownerEmails + the members allowlist
@@ -107,7 +133,7 @@ async function adminSeed() {
       }, { merge: true });
     });
     batch.set(L().collection("config").doc("settings"), {
-      season: LEAGUE.season, scoring: SCORING,
+      season: activeSeason(), scoring: SCORING,   // preserve a live-test data year
       tradeReviewHours: TRADE.reviewHours, vetoesNeeded: TRADE.vetoesNeeded,
       faabBudget: FAAB.budget, keeperMax: KEEPER.max,
     }, { merge: true });
@@ -127,7 +153,7 @@ async function adminBuildWeeks() {
   const notes = $("#ad-weeks-notes");
   notes.textContent = "Fetching MLB season dates…";
   try {
-    const res = await fetch(`https://statsapi.mlb.com/api/v1/seasons/${LEAGUE.season}?sportId=1`);
+    const res = await fetch(`https://statsapi.mlb.com/api/v1/seasons/${activeSeason()}?sportId=1`);
     const data = await res.json();
     const s = (data.seasons || [])[0] || {};
     const built = ScheduleGen.buildWeekMap({
@@ -148,7 +174,7 @@ async function adminSaveWeeks() {
   try {
     const weeks = JSON.parse($("#ad-weeks").value);
     if (!Array.isArray(weeks) || !weeks.length) throw new Error("weeks must be a non-empty array");
-    await L().collection("config").doc("settings").set({ weeks, season: LEAGUE.season }, { merge: true });
+    await L().collection("config").doc("settings").set({ weeks, season: activeSeason() }, { merge: true });
     toast(`Saved ${weeks.length} weeks.`, "success");
   } catch (e) { toast("Save failed: " + e.message, "error"); }
 }
