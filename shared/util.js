@@ -54,7 +54,8 @@ function fmtTimeET(isoUtc) {
 // index.html sets data-theme inline in <head> so the base look has no flash;
 // each app calls applyTheme(currentTheme()) on load to paint team colors.
 const THEME_BASES = ["classic", "light", "vintage"];
-const THEME_LABELS = { classic: "Classic", light: "Light", vintage: "Vintage" };
+// data-theme keeps the internal id "vintage"; the label shown to users is "All-Stars".
+const THEME_LABELS = { classic: "Classic", light: "Light", vintage: "All-Stars" };
 
 function currentTheme() {
   try { return localStorage.getItem("cas_theme") || "classic"; } catch (e) { return "classic"; }
@@ -77,18 +78,37 @@ function _shift(hex, amt) {   // amt<0 → toward black, amt>0 → toward white
   return "#" + ch.join("");
 }
 
-const _TEAM_VARS = ["--accent", "--accent-deep", "--on-accent", "--brand-bg", "--brand-fg", "--brand-sub"];
+const _TEAM_VARS = [
+  "--accent", "--accent-deep", "--on-accent", "--brand-bg", "--brand-fg", "--brand-sub",
+  "--ink", "--ink-2", "--panel", "--panel-2", "--hover", "--line", "--bg-glow", "--text", "--muted", "--cream",
+];
 function _applyTeamColors(root, c) {
-  const brandBg = c.primary;
+  const P = c.primary;
   let accent = c.secondary || c.primary;
-  // keep the accent bright enough to read on the dark base
+  // keep the accent bright enough to read on the dark, team-tinted surfaces
   if (_lum(accent) < 70) accent = (c.alt && _lum(c.alt) >= 70) ? c.alt : _shift(accent, 0.45);
-  root.style.setProperty("--brand-bg", brandBg);
-  root.style.setProperty("--brand-fg", _lum(brandBg) > 150 ? "#12141c" : "#ffffff");
-  root.style.setProperty("--brand-sub", accent);
-  root.style.setProperty("--accent", accent);
-  root.style.setProperty("--accent-deep", _shift(accent, -0.2));
-  root.style.setProperty("--on-accent", _lum(accent) > 150 ? "#12141c" : "#ffffff");
+  const set = (k, v) => root.style.setProperty(k, v);
+
+  // Whole-surface team tint: every panel is a very dark shade of the primary
+  // (mixing toward black keeps it dark and readable for any team color).
+  set("--ink", _shift(P, -0.88));
+  set("--ink-2", _shift(P, -0.85));
+  set("--panel", _shift(P, -0.80));
+  set("--panel-2", _shift(P, -0.72));
+  set("--hover", _shift(P, -0.66));
+  set("--line", _shift(P, -0.52));
+  set("--bg-glow", `radial-gradient(1200px 600px at 80% -10%, ${_shift(P, -0.72)} 0, ${_shift(P, -0.9)} 55%)`);
+  set("--text", "#f2f5fb");
+  set("--muted", "#aab4c6");
+  set("--cream", "#f2e8d5");
+
+  // Brand bar = the team's primary; accent = its pop color.
+  set("--brand-bg", P);
+  set("--brand-fg", _lum(P) > 150 ? "#12141c" : "#ffffff");
+  set("--brand-sub", accent);
+  set("--accent", accent);
+  set("--accent-deep", _shift(accent, -0.2));
+  set("--on-accent", _lum(accent) > 150 ? "#12141c" : "#ffffff");
 }
 
 function applyTheme(id) {

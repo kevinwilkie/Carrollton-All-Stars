@@ -259,7 +259,7 @@ function renderMyTeam() {
       `data-act="${kind === "bench" ? "move-in" : "fill"}" data-slot="${slotKey}" data-id="${id}" ` +
       `title="${escapeHtml(kind === "bench" ? "Move into the lineup" : "Choose a " + slotLabel(slotKey))}">` +
       `${chipType}${editable && !locked ? `<span class="chip-caret">▾</span>` : ""}</button>` +
-      `<span class="lu-player" data-act="card" data-id="${id}">${avatarHTML(p, 34)}` +
+      `<span class="lu-player" data-act="card" data-id="${id}">${avatarHTML(p, 44)}` +
       `<span class="lu-stack"><span class="lu-name">${escapeHtml(p.name)}</span>` +
       `<span class="lu-meta">${posBadges(p.positions, "sm")} ${escapeHtml(p.mlbTeam || "")}` +
       `${live && live.ilStatus ? ` <span class="il-flag">${escapeHtml(live.ilStatus)}</span>` : ""}` +

@@ -365,7 +365,7 @@ label { font-size: 13px; color: var(--muted); font-weight: 600; }
 .avatar {
   position: relative; display: inline-flex; align-items: center; justify-content: center;
   width: var(--sz, 32px); height: var(--sz, 32px); flex: 0 0 var(--sz, 32px);
-  border-radius: 50%; overflow: hidden; background: var(--av);
+  border-radius: calc(var(--sz, 32px) * .22); overflow: hidden; background: var(--av);
   vertical-align: middle;
 }
 .avatar-initials {
