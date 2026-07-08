@@ -11,6 +11,7 @@ import Scoring from "../shared/scoring.js";
 import Feasibility from "../draft/feasibility.js";
 import ScheduleGen from "../shared/schedule-gen.js";
 import { isCalledOff } from "../netlify/functions/lib/ingest.mjs";
+import { extractStatLines } from "../netlify/functions/lib/mlb.mjs";
 
 // ---------------------------------------------------------------- scoring engine
 test("scoring: hitting line (single + double + HR + walk + K)", () => {
@@ -39,6 +40,24 @@ test("scoring: not a QS at 5.2 IP", () => {
 
 test("scoring: outsOf parses 6.2 IP as 20 outs", () => {
   assert.equal(Scoring.outsOf({ inningsPitched: "6.2" }), 20);
+});
+
+// ------------------------------------------------------------ statline parsing
+test("ingest: a 0-out pitcher parses to outs:0, never undefined (Firestore-safe)", () => {
+  // A reliever pulled without recording an out: outs:0 but faced batters. The
+  // old `num(p.outs) || undefined` wrote undefined here, which made Firestore
+  // reject the whole nightly statline batch → no stats league-wide.
+  const box = { teams: {
+    home: { team: { id: 111 }, players: {
+      ID1: { person: { id: 1, fullName: "Gas Can" },
+        stats: { pitching: { outs: 0, battersFaced: 4, hits: 3, earnedRuns: 3, inningsPitched: "0.0" } } },
+    } },
+    away: { team: { id: 222 }, players: {} },
+  } };
+  const lines = extractStatLines(box, {});
+  assert.ok(lines[1] && lines[1].pitching, "pitching line present for a 0-out appearance");
+  assert.equal(lines[1].pitching.outs, 0);
+  for (const [k, v] of Object.entries(lines[1].pitching)) assert.notEqual(v, undefined, `pitching.${k} is undefined`);
 });
 
 // --------------------------------------------------------------- feasibility

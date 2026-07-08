@@ -99,7 +99,9 @@ export function extractStatLines(box, decisions = {}) {
       }
       if (p && Object.keys(p).length && (num(p.outs) > 0 || p.inningsPitched || num(p.battersFaced) > 0)) {
         line.pitching = {
-          outs: num(p.outs) || undefined,
+          // Always a number (0 for a pitcher pulled without an out) — an
+          // `undefined` here makes Firestore reject the whole statline batch.
+          outs: num(p.outs),
           inningsPitched: p.inningsPitched || "0.0",
           strikeOuts: num(p.strikeOuts), hits: num(p.hits),
           earnedRuns: num(p.earnedRuns), baseOnBalls: num(p.baseOnBalls),

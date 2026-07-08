@@ -17,6 +17,10 @@ export function initAdmin() {
       credential: admin.credential.cert(cred),
       databaseURL: process.env.FIREBASE_DB_URL || undefined,
     });
+    // Drop undefined fields instead of throwing on them — one stray value must
+    // never abort an entire nightly ingest/rollover batch. Must be set once,
+    // before any Firestore read/write.
+    admin.firestore().settings({ ignoreUndefinedProperties: true });
     inited = true;
   }
   return admin;
