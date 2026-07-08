@@ -163,7 +163,12 @@
     undraftedPrice: 5,     // flat $5 for waiver/FA pickups
     // Year 2 price = ESPN live draft trend AVG SALARY (rounded, $1 min),
     // frozen at the deadline below. No player may be kept a 3rd straight year.
-    espnDeadline: "2027-03-14", // YYYY-MM-DD ~1 week before the draft; update yearly
+    espnDeadline: "2027-03-14", // the CURRENT draft's ESPN price freeze (draft board); update yearly
+    // Season-app declarations are for NEXT season (LEAGUE.season + 1), so their
+    // deadline is ~a week before THAT season's draft — derived from the target
+    // year and this month/day, not the current-draft date above (which would
+    // otherwise lock the tab for the whole season it's declaring during).
+    deadlineMonthDay: "03-14",
   };
 
   return {

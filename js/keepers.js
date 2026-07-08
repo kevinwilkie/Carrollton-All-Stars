@@ -48,9 +48,18 @@ function renderKeepers() {
   if (!kpRoster) { ensureKeeperData(); return host.innerHTML = `<div class="empty-note">Loading…</div>`; }
 
   const declared = new Set(((kpDecl && kpDecl.entries) || []).map((e) => String(e.mlbId)));
-  const locked = etDate() > KEEPER.espnDeadline;   // declarations freeze at the deadline
+  const declSeason = LEAGUE.season + 1;            // the tab declares NEXT season's keepers
+  const deadline = `${declSeason}-${KEEPER.deadlineMonthDay || "03-14"}`; // ~a week before that draft
+  const locked = etDate() > deadline;              // freezes at next season's deadline, not this draft's
   const players = Object.values(kpRoster.players || {})
     .sort((a, b) => (b.price || 0) - (a.price || 0));
+  // Running keeper commitment against next year's auction budget.
+  const declaredPlayers = players.filter((p) => declared.has(String(p.mlbId)));
+  let keeperSpend = 0, keeperTbd = 0;
+  declaredPlayers.forEach((p) => {
+    const c = keeperCostOf(p);
+    if (c.cost != null) keeperSpend += c.cost; else if (c.eligible) keeperTbd++;
+  });
 
   const rows = players.map((p) => {
     const k = keeperCostOf(p);
@@ -67,18 +76,22 @@ function renderKeepers() {
       `<span class="grow"><span class="pl-name">${escapeHtml(p.name)} ${badge}</span>` +
       `<span class="sub">${(p.positions || []).join("/")} · via ${escapeHtml(p.via || "draft")} ($${p.price || 0})` +
       ` · ${escapeHtml(k.formula)}</span></span>` +
-      `<span class="cost">${k.cost != null ? "$" + k.cost : k.eligible ? "ESPN avg" : "—"}</span>` +
+      `<span class="cost">${k.cost != null ? "$" + k.cost : k.eligible ? "~ESPN avg" : "—"}</span>` +
       `<button class="btn btn-small btn-ghost keeper-declare${on ? " on" : ""}" ${disabled ? "disabled" : ""} ` +
       `data-keep="${p.mlbId}">${label}</button></div>`;
   }).join("") || `<div class="empty-note">No players on your roster yet.</div>`;
 
+  const budgetLine =
+    `<p class="hint">Keeper commitment: <b>$${keeperSpend}</b> of the $${BUDGET} auction budget` +
+    (keeperTbd ? ` · plus ${keeperTbd} at ~ESPN avg (set at the ${declSeason} draft)` : "") + `.</p>`;
   host.innerHTML =
-    `<div class="view-head"><h2>Keepers · ${LEAGUE.season + 1}</h2>` +
+    `<div class="view-head"><h2>Keepers · ${declSeason}</h2>` +
     `<span class="pill${declared.size > KEEPER.max ? " pill-bad" : ""}">${declared.size}/${KEEPER.max} declared</span></div>` +
-    `<p class="hint">Declare up to ${KEEPER.max} keepers for next season. Year 1 = this year's price + $${KEEPER.y1Inflation} ` +
+    `<p class="hint">Declare up to ${KEEPER.max} keepers for the ${declSeason} season. Year 1 = this year's price + $${KEEPER.y1Inflation} ` +
     `($${KEEPER.undraftedPrice} for pickups); Year 2 = ESPN average salary (final year — no 3rd straight). ` +
-    `Deadline: ${KEEPER.espnDeadline}.</p>` +
-    (locked ? `<p class="hint" style="color:var(--warn)">🔒 The ${KEEPER.espnDeadline} deadline has passed — declarations are locked.</p>` : "") +
+    `Deadline: ${deadline}.</p>` +
+    budgetLine +
+    (locked ? `<p class="hint" style="color:var(--warn)">🔒 The ${deadline} deadline has passed — declarations are locked.</p>` : "") +
     `<div class="card">${rows}</div>`;
 
   host.querySelectorAll("[data-keep]:not([disabled])").forEach((b) =>

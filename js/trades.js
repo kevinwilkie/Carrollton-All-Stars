@@ -34,6 +34,7 @@ function renderTrades() {
     let actions = "";
     if (t.status === "proposed" && t.to === App.myTeamId)
       actions = `<button class="btn btn-small" data-accept="${t.id}">Accept</button>` +
+                `<button class="btn btn-ghost btn-small" data-counter="${t.id}">Counter</button>` +
                 `<button class="btn btn-danger-ghost btn-small" data-reject="${t.id}">Reject</button>`;
     if (t.status === "proposed" && t.from === App.myTeamId)
       actions = `<button class="btn btn-ghost btn-small" data-withdraw="${t.id}">Withdraw</button>`;
@@ -51,6 +52,7 @@ function renderTrades() {
       `<span class="${statusPill}">${t.status}</span>${review}<span style="margin-left:auto">${actions}</span></div>` +
       `<div class="trade-players"><b>${escapeHtml(teamName(t.from))}</b> sends: ${nameList(t.gives)}</div>` +
       `<div class="trade-players"><b>${escapeHtml(teamName(t.to))}</b> sends: ${nameList(t.gets)}</div>` +
+      (t.note ? `<div class="sub">📝 ${escapeHtml(t.note)}</div>` : "") +
       (t.resolvedNote ? `<div class="sub">${escapeHtml(t.resolvedNote)}</div>` : "") +
       `</div>`;
   };
@@ -67,9 +69,14 @@ function renderTrades() {
   if (!App.players) loadPlayers().then(renderActive);
 
   const bp = $("#btn-propose");
-  if (bp) bp.addEventListener("click", openTradeModal);
+  if (bp) bp.addEventListener("click", () => openTradeModal());
   host.querySelectorAll("[data-accept]").forEach((b) => b.addEventListener("click", () => actTrade(() => respondTrade(b.dataset.accept, true), "Trade accepted — the 24-hour league review has started.")));
   host.querySelectorAll("[data-reject]").forEach((b) => b.addEventListener("click", () => actTrade(() => respondTrade(b.dataset.reject, false), "Trade rejected.")));
+  // Counter = a new proposal back with the sides swapped, pre-filled to tweak.
+  host.querySelectorAll("[data-counter]").forEach((b) => b.addEventListener("click", () => {
+    const t = App.trades.find((x) => x.id === b.dataset.counter);
+    if (t) openTradeModal({ partner: t.from, gives: t.gets, gets: t.gives });
+  }));
   host.querySelectorAll("[data-withdraw]").forEach((b) => b.addEventListener("click", () => actTrade(() => withdrawTrade(b.dataset.withdraw), "Trade withdrawn.")));
   host.querySelectorAll("[data-veto]").forEach((b) => b.addEventListener("click", () => actTrade(() => vetoTrade(b.dataset.veto, !!b.dataset.on), b.dataset.on ? "Veto recorded." : "Veto removed.")));
 }
@@ -79,12 +86,19 @@ async function actTrade(fn, okMsg) {
   catch (e) { toast("Action failed: " + (e.message || "permission denied"), "error"); }
 }
 
-async function openTradeModal() {
-  trGives = new Set(); trGets = new Set();
+// prefill (from a Counter): { partner, gives, gets } with the sides already
+// swapped to this owner's perspective. Called with no args for a fresh proposal
+// (and tolerant of being handed a DOM event).
+async function openTradeModal(prefill) {
+  const pf = prefill && prefill.partner ? prefill : null;
+  trGives = new Set(((pf && pf.gives) || []).map(String));
+  trGets = new Set(((pf && pf.gets) || []).map(String));
   const sel = $("#trade-partner");
   sel.innerHTML = "";
   LEAGUE_TEAMS.filter((t) => t.id !== App.myTeamId)
     .forEach((t) => sel.add(new Option(t.name, t.id)));
+  if (pf) sel.value = pf.partner;
+  const note = $("#trade-note"); if (note) note.value = "";
   await refreshTradeLists();
   $("#trade-error").hidden = true;
   $("#trade-modal").hidden = false;
@@ -128,7 +142,8 @@ function wireTradeModal() {
     if (myAfter > TRADE_MAX) return err(`This would put your roster at ${myAfter}/${TRADE_MAX}. Send more or receive fewer.`);
     if (theirAfter > TRADE_MAX) return err(`This would put ${teamName($("#trade-partner").value)} at ${theirAfter}/${TRADE_MAX}.`);
     try {
-      await proposeTrade($("#trade-partner").value, [...trGives], [...trGets]);
+      const note = ($("#trade-note").value || "").trim();
+      await proposeTrade($("#trade-partner").value, [...trGives], [...trGets], note);
       $("#trade-modal").hidden = true;
       toast("Trade proposed.", "success");
     } catch (e2) {

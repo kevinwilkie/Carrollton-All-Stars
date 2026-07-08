@@ -176,9 +176,10 @@ async function cancelClaim(id) {
   await L().collection("claims").doc(id).delete();
 }
 
-async function proposeTrade(to, gives, gets) {
+async function proposeTrade(to, gives, gets, note) {
   await L().collection("trades").add({
     from: App.myTeamId, to, gives, gets,
+    note: note || null,
     status: "proposed",
     proposedAt: new Date().toISOString(),
     vetoes: {},
