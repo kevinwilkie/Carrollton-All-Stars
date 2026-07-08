@@ -13,6 +13,7 @@ import { syncPlayers } from "./lib/players-sync.mjs";
 import { ensureLineups } from "./lib/lineups.mjs";
 import { etDate, addDays, CFG } from "./lib/league.mjs";
 import { leagueRef } from "./lib/firebase.mjs";
+import { notify, failuresIn } from "./lib/alert.mjs";
 
 export default async () => {
   const today = etDate();
@@ -53,6 +54,9 @@ export default async () => {
     return n;
   });
   await step("lineupsCreated", () => ensureLineups(today));
+
+  const fails = failuresIn(out);
+  if (fails.length) await notify(`⚠️ daily-rollover: ${fails.join(" · ")}`);
 
   console.log("daily-rollover:", JSON.stringify(out));
   return new Response(JSON.stringify(out), { headers: { "content-type": "application/json" } });

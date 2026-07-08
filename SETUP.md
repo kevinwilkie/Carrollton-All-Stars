@@ -71,6 +71,9 @@ The nightly stats/waivers/trades jobs run on Netlify and need admin access to Fi
 3. Netlify → **Site configuration → Environment variables → Add a variable**:
    - `FIREBASE_SERVICE_ACCOUNT_B64` = *paste from clipboard*
    - `FIREBASE_DB_URL` = your Realtime Database URL (from step 2.3)
+   - `ALERT_WEBHOOK` *(optional)* = a Slack or Discord incoming-webhook URL. If set, the
+     nightly jobs post a one-line alert when a step fails (e.g. waivers didn't run), so a
+     silent failure reaches you. Leave it unset to skip alerts.
 4. **Deploys → Trigger deploy** so the functions pick up the variables.
 5. Check it worked: **Logs → Functions → daily-rollover** should show a successful run
    the next morning (or trigger one from the season app's **Admin** tab → *Run jobs*).

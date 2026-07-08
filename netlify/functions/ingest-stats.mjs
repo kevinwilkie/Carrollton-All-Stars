@@ -7,6 +7,7 @@
  */
 import { ingestDate } from "./lib/ingest.mjs";
 import { etDate, addDays } from "./lib/league.mjs";
+import { notify } from "./lib/alert.mjs";
 
 export default async () => {
   const today = etDate();
@@ -26,6 +27,11 @@ export default async () => {
       results.push({ date, error: String(e && e.message || e) });
     }
   }
+  const fails = results
+    .filter((r) => r.error || (r.failed && r.failed.length))
+    .map((r) => r.error ? `${r.date}: ${r.error}` : `${r.date}: ${r.failed.length} box score(s) failed`);
+  if (fails.length) await notify(`⚠️ ingest-stats: ${fails.join(" · ")}`);
+
   console.log("ingest-stats:", JSON.stringify(results));
   return new Response(JSON.stringify(results), { headers: { "content-type": "application/json" } });
 };
