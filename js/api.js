@@ -138,6 +138,22 @@ async function saveLineupSlots(slots) {
   }
 }
 
+// Instant drop — cut a player to a free agent now (adds still go through FAAB).
+// Hits the roster-move function with the signed-in owner's ID token; the server
+// verifies ownership and keeps roster + ownership + lineup consistent.
+async function dropPlayer(mlbId) {
+  if (!Auth.user) throw new Error("Sign in to manage your roster.");
+  const idToken = await Auth.user.getIdToken();
+  const res = await fetch("/.netlify/functions/roster-move", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ idToken, action: "drop", mlbId: String(mlbId) }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.ok) throw new Error(data.error || `Drop failed (${res.status}).`);
+  return data;
+}
+
 async function placeClaim(player, bid, dropId) {
   await L().collection("claims").add({
     teamId: App.myTeamId,

@@ -45,7 +45,13 @@ export default async () => {
   await step("waivers", () => processClaims(today));
   await step("expiredClaims", () => expireStaleClaims(today));
   await step("playersSynced", () => syncPlayers(yesterday, season));
-  await step("todaysGames", async () => (await ensureMlbDay(today, { refresh: true })).length);
+  // Today (refreshed for live status) plus the next week, so owners setting
+  // tomorrow…+7 lineups see real game times and opponents instead of "No game".
+  await step("upcomingGames", async () => {
+    let n = 0;
+    for (let i = 0; i <= 7; i++) n += (await ensureMlbDay(addDays(today, i), { refresh: i === 0 })).length;
+    return n;
+  });
   await step("lineupsCreated", () => ensureLineups(today));
 
   console.log("daily-rollover:", JSON.stringify(out));

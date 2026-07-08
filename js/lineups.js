@@ -519,6 +519,11 @@ function openPlayerCard(id) {
       actions = `<div class="pc-actions">${btns.join("")}</div>`;
     }
   }
+  // Drop is a roster move (not a lineup edit), so it's offered on any date for a
+  // player on your roster. Adds still go through daily FAAB.
+  if (onMyRoster && Auth.role !== "local") {
+    actions += `<div class="pc-actions"><button class="btn btn-danger-ghost" data-card="drop">Drop player</button></div>`;
+  }
 
   const summaryHTML =
     (g ? `<div class="pc-game">${g.status === "Final" ? "Final" : g.status === "Live" ? "● Live" : (g.firstPitchUTC ? fmtTimeET(g.firstPitchUTC) : "Today")}` +
@@ -557,7 +562,26 @@ function openPlayerCard(id) {
     if (a === "bench" || a === "activate") return benchPlayer(id);
     if (a === "start") { closeSheet(); return openMovePicker(id); }
     if (a === "il") { const slot = IL_KEYS.find((k) => !il[k]); if (!slot) return toast("Your IL is full.", "error"); return moveIntoSlot(id, slot); }
+    if (a === "drop") return confirmDrop(id);
   }));
+}
+
+async function confirmDrop(id) {
+  const p = metaOf(id);
+  if (!window.confirm(`Drop ${p.name}? He becomes a free agent immediately — you'd have to win him back through daily FAAB.`)) return;
+  try {
+    const btn = document.querySelector('#mt-sheet [data-card="drop"]');
+    if (btn) { btn.disabled = true; btn.textContent = "Dropping…"; }
+    await dropPlayer(id);
+    toast(`${p.name} dropped.`, "success");
+    closeSheet();
+    luRoster = null;
+    ensureMyTeamData();
+  } catch (e) {
+    toast(e.message || "Drop failed.", "error");
+    const btn = document.querySelector('#mt-sheet [data-card="drop"]');
+    if (btn) { btn.disabled = false; btn.textContent = "Drop player"; }
+  }
 }
 
 // Game-by-game statlines as a scrollable table (batting or pitching columns).
