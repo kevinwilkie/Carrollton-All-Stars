@@ -9,10 +9,23 @@ function renderSettings() {
   const email = Auth.user && Auth.user.email;
   const t = App.myTeamId ? (App.teams[App.myTeamId] || {}) : null;
 
+  const cur = currentTheme();
+  const bases = THEME_BASES.map((b) =>
+    `<button class="theme-swatch base${cur === b ? " on" : ""}" data-theme-id="${b}">${THEME_LABELS[b]}</button>`).join("");
+  const teams = (typeof TEAMS !== "undefined" ? TEAMS : []).slice()
+    .sort((a, b) => a.abbr.localeCompare(b.abbr)).map((tm) => {
+      const c = (typeof TEAM_COLORS !== "undefined" && TEAM_COLORS[tm.abbr]) || {};
+      const id = "mlb:" + tm.abbr;
+      return `<button class="theme-swatch team${cur === id ? " on" : ""}" data-theme-id="${id}" ` +
+        `title="${escapeHtml(tm.name)}" style="background:${c.primary || "#333"};` +
+        `border-color:${c.secondary || c.primary || "#333"}">${tm.abbr}</button>`;
+    }).join("");
   const appearance =
     `<div class="card"><h3>Appearance</h3>` +
-    `<p class="hint">Switch between the Classic dark look and the Vintage logo palette (saved on this device).</p>` +
-    `<button id="btn-theme" class="btn btn-ghost"></button></div>`;
+    `<p class="hint">Pick a look — saved on this device.</p>` +
+    `<div class="theme-row">${bases}</div>` +
+    `<div class="pc-sec">MLB team colors</div>` +
+    `<div class="theme-grid">${teams}</div></div>`;
 
   const teamCard = App.myTeamId
     ? `<div class="card"><h3>My Team</h3>` +
@@ -44,7 +57,8 @@ function renderSettings() {
   host.innerHTML = `<div class="view-head"><h2>Settings</h2></div>` +
     `<div class="stack">${appearance}${teamCard}${account}</div>`;
 
-  wireThemeButton($("#btn-theme"));
+  host.querySelectorAll("[data-theme-id]").forEach((b) =>
+    b.addEventListener("click", () => { applyTheme(b.dataset.themeId); renderActive(); }));
   const si = $("#set-signin"); if (si) si.addEventListener("click", signInGoogle);
   const so = $("#set-signout"); if (so) so.addEventListener("click", signOutUser);
 

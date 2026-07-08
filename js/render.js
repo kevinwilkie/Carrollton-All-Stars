@@ -93,6 +93,7 @@ function applyRole() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+  applyTheme(currentTheme());   // paint team colors (base look already set inline in <head>)
   trackHeaderHeight();
   // Retry a failed view load: clear its error and re-render (the loader re-runs).
   document.addEventListener("click", (e) => {

@@ -174,13 +174,15 @@ test("settings: theme toggle + team profile editor, header has no stray controls
   await seedSeason(page);
   await page.evaluate(() => setTab("settings"));
   await page.waitForTimeout(150);
-  assert.ok(await page.evaluate(() => !!document.querySelector("#view-settings #btn-theme")), "theme toggle in settings");
+  assert.ok(await page.evaluate(() => document.querySelectorAll("#view-settings .theme-swatch").length > 30), "theme picker incl. team options");
   assert.ok(await page.evaluate(() => !!document.querySelector("#view-settings #set-name")), "team name editor");
-  // theme toggle flips the data-theme attribute
-  const before = await page.evaluate(() => document.documentElement.dataset.theme);
-  await page.click("#view-settings #btn-theme");
-  const after = await page.evaluate(() => document.documentElement.dataset.theme);
-  assert.notEqual(before, after);
+  // base theme picks flip data-theme
+  await page.click('#view-settings [data-theme-id="light"]');
+  assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), "light");
+  // a team theme paints an inline accent on the dark base
+  await page.click('#view-settings [data-theme-id="mlb:NYY"]');
+  assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), "classic");
+  assert.ok(await page.evaluate(() => !!document.documentElement.style.getPropertyValue("--accent")), "team accent applied");
   // saving the team profile calls the API
   await page.evaluate(() => { window.__profile = null; window.saveTeamProfile = async (p) => { window.__profile = p; }; });
   await page.fill("#view-settings #set-name", "New Name");

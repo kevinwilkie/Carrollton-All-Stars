@@ -43,6 +43,17 @@
 .set-fields { display: flex; flex-direction: column; gap: 4px; }
 .set-fields label { margin-top: 8px; }
 .set-fields input { width: 100%; }
+
+/* Theme picker */
+.theme-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
+.theme-swatch {
+  appearance: none; cursor: pointer; font: inherit; font-weight: 800;
+  border-radius: 10px; border: 2px solid var(--line); color: #fff;
+}
+.theme-swatch.base { background: var(--panel-2); color: var(--text); padding: 10px 16px; }
+.theme-swatch.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+.theme-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(56px, 1fr)); gap: 6px; margin-top: 6px; }
+.theme-swatch.team { padding: 12px 4px; font-size: 12px; text-align: center; text-shadow: 0 1px 2px rgba(0,0,0,.55); }
 .tc-link {
   appearance: none; cursor: pointer; font: inherit; font-weight: 700; font-size: 13px;
   background: var(--panel-2); color: var(--text); border: 1px solid var(--line);

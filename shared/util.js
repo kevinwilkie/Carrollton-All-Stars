@@ -46,19 +46,73 @@ function fmtTimeET(isoUtc) {
     { hour: "numeric", minute: "2-digit", timeZone: "America/New_York" }) + " ET";
 }
 
-// ---- Theme ("classic" dark / "vintage" logo palette) --------------------------
-// Applied per device; both apps call wireThemeButton() on their topbar button.
-// index.html also sets data-theme inline in <head> so there's no flash.
-function themeLabel() {
-  return document.documentElement.dataset.theme === "vintage" ? "🌙 Classic" : "⭐ Vintage";
+// ---- Theme -------------------------------------------------------------------
+// Base looks are CSS blocks keyed on <html data-theme>; MLB team looks reuse the
+// dark base and set the team's colors as inline custom properties (computed from
+// draft/data/mlb-teams.js TEAM_COLORS). Selection is saved per device as
+// localStorage "cas_theme" — one of "classic" | "light" | "vintage" | "mlb:ABBR".
+// index.html sets data-theme inline in <head> so the base look has no flash;
+// each app calls applyTheme(currentTheme()) on load to paint team colors.
+const THEME_BASES = ["classic", "light", "vintage"];
+const THEME_LABELS = { classic: "Classic", light: "Light", vintage: "Vintage" };
+
+function currentTheme() {
+  try { return localStorage.getItem("cas_theme") || "classic"; } catch (e) { return "classic"; }
 }
+
+// perceived luminance (0–255) and a darken/lighten helper for deriving shades
+function _lum(hex) {
+  const h = String(hex).replace("#", "");
+  if (h.length < 6) return 128;
+  return 0.299 * parseInt(h.slice(0, 2), 16) + 0.587 * parseInt(h.slice(2, 4), 16) + 0.114 * parseInt(h.slice(4, 6), 16);
+}
+function _shift(hex, amt) {   // amt<0 → toward black, amt>0 → toward white
+  const h = String(hex).replace("#", "");
+  if (h.length < 6) return hex;
+  const ch = [0, 2, 4].map((i) => {
+    let v = parseInt(h.slice(i, i + 2), 16);
+    v = amt < 0 ? Math.round(v * (1 + amt)) : Math.round(v + (255 - v) * amt);
+    return Math.max(0, Math.min(255, v)).toString(16).padStart(2, "0");
+  });
+  return "#" + ch.join("");
+}
+
+const _TEAM_VARS = ["--accent", "--accent-deep", "--on-accent", "--brand-bg", "--brand-fg", "--brand-sub"];
+function _applyTeamColors(root, c) {
+  const brandBg = c.primary;
+  let accent = c.secondary || c.primary;
+  // keep the accent bright enough to read on the dark base
+  if (_lum(accent) < 70) accent = (c.alt && _lum(c.alt) >= 70) ? c.alt : _shift(accent, 0.45);
+  root.style.setProperty("--brand-bg", brandBg);
+  root.style.setProperty("--brand-fg", _lum(brandBg) > 150 ? "#12141c" : "#ffffff");
+  root.style.setProperty("--brand-sub", accent);
+  root.style.setProperty("--accent", accent);
+  root.style.setProperty("--accent-deep", _shift(accent, -0.2));
+  root.style.setProperty("--on-accent", _lum(accent) > 150 ? "#12141c" : "#ffffff");
+}
+
+function applyTheme(id) {
+  const root = document.documentElement;
+  _TEAM_VARS.forEach((v) => root.style.removeProperty(v));
+  if (id && id.indexOf("mlb:") === 0) {
+    root.dataset.theme = "classic";                       // team looks sit on the dark base
+    const c = (typeof TEAM_COLORS !== "undefined") && TEAM_COLORS[id.slice(4)];
+    if (c) _applyTeamColors(root, c);
+  } else {
+    root.dataset.theme = id || "classic";
+  }
+  try { localStorage.setItem("cas_theme", id); } catch (e) {}
+}
+
+// Draft board keeps a single button that cycles the three base looks.
+function themeLabel() { return "🎨 " + (THEME_LABELS[currentTheme()] || "Theme"); }
 function wireThemeButton(btn) {
   if (!btn) return;
+  applyTheme(currentTheme());
   btn.textContent = themeLabel();
   btn.addEventListener("click", () => {
-    const next = document.documentElement.dataset.theme === "vintage" ? "classic" : "vintage";
-    document.documentElement.dataset.theme = next;
-    try { localStorage.setItem("cas_theme", next); } catch (e) {}
+    const i = THEME_BASES.indexOf(currentTheme());   // team theme → -1 → steps to classic
+    applyTheme(THEME_BASES[(i + 1) % THEME_BASES.length]);
     btn.textContent = themeLabel();
   });
 }

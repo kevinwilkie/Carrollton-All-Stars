@@ -86,6 +86,46 @@ html[data-theme="vintage"] .pill-warn { color: var(--warn); }
 html[data-theme="vintage"] .role-badge.role-owner,
 html[data-theme="vintage"] .role-badge.role-viewer { color: #2f4a86; }
 
+/* ---------------- "Light" theme — clean & fresh --------------------------------
+   Cool-white surfaces, crisp ink, the same stitch-red accent. */
+html[data-theme="light"] {
+  --ink:       #eef1f6;   /* app background */
+  --ink-2:     #e7ebf3;
+  --panel:     #ffffff;
+  --panel-2:   #f3f6fb;
+  --line:      #dde3ec;
+  --hover:     #eaeef6;
+
+  --text:      #1a2233;
+  --muted:     #667089;
+  --cream:     #1a2233;   /* eyebrows go dark ink on white */
+
+  --accent:      #e5484d;
+  --accent-deep: #c93a3f;
+  --on-accent:   #ffffff;
+  --good:      #1a7f37;  --good-bg: #e4f4e9;
+  --bad:       #c92a2a;  --bad-bg:  #fbe4e4;
+  --warn:      #9a6b1f;  --warn-bg: #f6edd6;
+  --gold:      #b8860b;
+  --av:        #d0563e;
+
+  --shadow:    0 1px 3px rgba(20,30,50,.10), 0 4px 16px rgba(20,30,50,.06);
+
+  --brand-bg:  #ffffff;   /* white topbar, dark lettering, red accent underline */
+  --brand-fg:  #1a2233;
+  --brand-sub: #e5484d;
+  --bg-glow:   radial-gradient(1200px 600px at 80% -10%, #ffffff 0, #eef1f6 55%);
+}
+html[data-theme="light"] .tabs { background: rgba(238,241,246,.92); }
+html[data-theme="light"] .topbar .icon-btn:hover { background: rgba(0,0,0,.06); }
+html[data-theme="light"] .avatar-initials { color: #fff; }
+/* status pills hardcode pale dark-theme text — restore full color on white */
+html[data-theme="light"] .pill-live, html[data-theme="light"] .role-badge.role-commish { color: var(--good); }
+html[data-theme="light"] .pill-bad  { color: var(--bad); }
+html[data-theme="light"] .pill-warn { color: var(--warn); }
+html[data-theme="light"] .role-badge.role-owner,
+html[data-theme="light"] .role-badge.role-viewer { color: #2f4a86; }
+
 * { box-sizing: border-box; }
 
 html, body {
