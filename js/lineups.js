@@ -302,13 +302,15 @@ function renderMyTeam() {
   // ---- Team summary card (record · rank · owner, week points, shortcuts) ----
   const cfgTeam = LEAGUE_TEAMS.find((x) => x.id === App.myTeamId) || {};
   const rank = myRank();
-  const startsUsed = luScore && luScore.startsUsed != null ? luScore.startsUsed : null;
+  // Show the weekly pitcher-starts pill for the whole scoring week, even before
+  // any starts accrue (the score doc may not carry startsUsed yet → default 0).
+  const startsUsed = (luScore && luScore.startsUsed) || 0;
   const weekPts = (luScore && luScore.total) ?? 0;
   const faab = (App.teams[App.myTeamId] || {}).faabRemaining;
   const statPills =
     (faab != null ? `<span class="pill pill-live" title="FAAB budget remaining">$${faab} FAAB</span>` : "") +
     (wk ? `<span class="pill">Week ${wk.n}${wk.type === "playoff" ? " · Playoffs" : ""}</span>` : "") +
-    (startsUsed != null
+    (wk
       ? `<span class="pill${startsUsed >= PITCHING.maxStartsPerWeek ? " pill-warn" : ""}" ` +
         `title="Only ${PITCHING.maxStartsPerWeek} pitcher starts count per week">` +
         `${startsUsed}/${PITCHING.maxStartsPerWeek} SP starts</span>`
