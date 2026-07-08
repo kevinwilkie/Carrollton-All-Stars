@@ -90,15 +90,32 @@ test("draft board: loads, records a pick, deducts budget, undoes", async () => {
   await page.close();
 });
 
-test("season app: every tab renders in local mode with no JS errors", async () => {
+test("season app: every view renders in local mode with no JS errors", async () => {
   const page = await browser.newPage();
   const errs = watch(page);
   await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
   assert.ok((await page.title()).includes("Fantasy Baseball"));
-  for (const tab of ["matchup", "scoreboard", "standings", "players", "trades", "transactions", "schedule", "keepers"]) {
-    await page.click(`.tab[data-tab="${tab}"]`);
+  for (const tab of ["league", "matchup", "scoreboard", "standings", "players", "trades", "transactions", "schedule", "keepers"]) {
+    await page.evaluate((t) => setTab(t), tab);
     assert.ok((await page.innerHTML(`#view-${tab}`)).length > 10, `${tab} renders`);
   }
+  assert.deepEqual(realErrors(errs), []);
+  await page.close();
+});
+
+test("nav: 4 top tabs, hamburger opens the menu and navigates", async () => {
+  const page = await browser.newPage();
+  const errs = watch(page);
+  await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
+  assert.equal(await page.locator(".tabs .tab").count(), 4);
+  assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector("#menu-drawer")).visibility), "hidden");
+  await page.click("#btn-menu");
+  await page.waitForTimeout(250);
+  assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector("#menu-drawer")).visibility), "visible");
+  await page.click('.menu-item[data-tab="scoreboard"]');
+  await page.waitForTimeout(250);
+  assert.ok(await page.evaluate(() => !document.querySelector("#view-scoreboard").hidden), "scoreboard shown");
+  assert.equal(await page.evaluate(() => document.body.classList.contains("menu-open")), false, "menu closed after nav");
   assert.deepEqual(realErrors(errs), []);
   await page.close();
 });

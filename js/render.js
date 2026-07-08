@@ -6,6 +6,7 @@
 
 const RENDERERS = {
   myteam: () => renderMyTeam(),
+  league: () => renderLeague(),
   matchup: () => renderMatchup(),
   scoreboard: () => renderScoreboard(),
   standings: () => renderStandings(),
@@ -24,7 +25,19 @@ function setTab(name) {
     if (v) v.hidden = t !== name;
   });
   $$(".tab").forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
+  $$(".menu-item[data-tab]").forEach((b) => b.classList.toggle("on", b.dataset.tab === name));
+  closeMenu();
   renderActive();
+}
+
+// ---- slide-out menu (secondary pages) ----------------------------------------
+function openMenu() {
+  document.body.classList.add("menu-open");
+  const b = $("#btn-menu"); if (b) b.setAttribute("aria-expanded", "true");
+}
+function closeMenu() {
+  document.body.classList.remove("menu-open");
+  const b = $("#btn-menu"); if (b) b.setAttribute("aria-expanded", "false");
 }
 
 function renderActive() {
@@ -64,7 +77,7 @@ function applyRole() {
   const badge = $("#role-badge");
   const authBtn = $("#btn-auth");
   const gate = $("#gate");
-  $("#tab-admin").hidden = Auth.role !== "commish";
+  $("#menu-admin").hidden = Auth.role !== "commish";
 
   if (Auth.role === "local") {
     gate.hidden = true;
@@ -113,6 +126,12 @@ document.addEventListener("DOMContentLoaded", () => {
     renderActive();
   });
   $$(".tab").forEach((b) => b.addEventListener("click", () => setTab(b.dataset.tab)));
+  // Slide-out menu: ☰ opens it, its items switch tab (setTab closes the menu),
+  // and the ✕ / backdrop / Escape close it.
+  $("#btn-menu").addEventListener("click", openMenu);
+  $("#menu-close").addEventListener("click", closeMenu);
+  $("#menu-overlay").addEventListener("click", closeMenu);
+  $$(".menu-item[data-tab]").forEach((b) => b.addEventListener("click", () => setTab(b.dataset.tab)));
   $("#btn-auth").addEventListener("click", () => {
     if (Auth.user) signOutUser(); else signInGoogle();
   });
@@ -121,7 +140,7 @@ document.addEventListener("DOMContentLoaded", () => {
   wireClaimModal();
   wireTradeModal();
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") { $("#claim-modal").hidden = true; $("#trade-modal").hidden = true; }
+    if (e.key === "Escape") { closeMenu(); $("#claim-modal").hidden = true; $("#trade-modal").hidden = true; }
   });
 
   const ok = apiInit();

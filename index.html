@@ -12,11 +12,14 @@
 </head>
 <body>
   <header class="topbar">
-    <div class="brand">
-      <div class="brand-badge"><img src="assets/logo.png" alt="Carrollton All-Stars" /></div>
-      <div class="brand-text">
-        <h1>Carrollton All-Stars</h1>
-        <span class="tagline">Fantasy Baseball</span>
+    <div class="topbar-left">
+      <button id="btn-menu" class="icon-btn" aria-label="Open menu" aria-expanded="false" aria-controls="menu-drawer">☰</button>
+      <div class="brand">
+        <div class="brand-badge"><img src="assets/logo.png" alt="Carrollton All-Stars" /></div>
+        <div class="brand-text">
+          <h1>Carrollton All-Stars</h1>
+          <span class="tagline">Fantasy Baseball</span>
+        </div>
       </div>
     </div>
     <div class="topbar-actions">
@@ -32,18 +35,34 @@
   <nav class="tabs" id="tabs">
     <button class="tab active" data-tab="myteam">My Team</button>
     <button class="tab" data-tab="matchup">Matchup</button>
-    <button class="tab" data-tab="scoreboard">Scoreboard</button>
-    <button class="tab" data-tab="standings">Standings</button>
     <button class="tab" data-tab="players">Players</button>
-    <button class="tab" data-tab="trades">Trades</button>
-    <button class="tab" data-tab="transactions">Transactions</button>
-    <button class="tab" data-tab="schedule">Schedule</button>
-    <button class="tab" data-tab="keepers">Keepers</button>
-    <button class="tab" data-tab="admin" id="tab-admin" hidden>Admin</button>
+    <button class="tab" data-tab="league">League</button>
   </nav>
+
+  <!-- Slide-out menu for the secondary pages (opened by the ☰ button) -->
+  <div id="menu-overlay" class="menu-overlay"></div>
+  <aside id="menu-drawer" class="menu-drawer" aria-label="More pages">
+    <div class="menu-head">
+      <span class="eyebrow">Menu</span>
+      <button id="menu-close" class="icon-btn" aria-label="Close menu">✕</button>
+    </div>
+    <nav class="menu-nav">
+      <button class="menu-item" data-tab="scoreboard">📊 Scoreboard</button>
+      <button class="menu-item" data-tab="standings">🏆 Standings</button>
+      <button class="menu-item" data-tab="schedule">🗓️ Schedule</button>
+      <button class="menu-item" data-tab="transactions">📋 Transactions</button>
+      <button class="menu-item" data-tab="trades">🔁 Trades</button>
+      <button class="menu-item" data-tab="keepers">🧢 Keepers</button>
+      <button class="menu-item" id="menu-admin" data-tab="admin" hidden>✎ Admin</button>
+    </nav>
+    <div class="menu-foot">
+      <a class="menu-item" href="draft/">🧢 Draft Board</a>
+    </div>
+  </aside>
 
   <main id="content">
     <section class="view" id="view-myteam"></section>
+    <section class="view" id="view-league" hidden></section>
     <section class="view" id="view-matchup" hidden></section>
     <section class="view" id="view-scoreboard" hidden></section>
     <section class="view" id="view-standings" hidden></section>
@@ -136,6 +155,7 @@
   <script src="js/matchup.js"></script>
   <script src="js/scoreboard.js"></script>
   <script src="js/standings.js"></script>
+  <script src="js/league.js"></script>
   <script src="js/players.js"></script>
   <script src="js/trades.js"></script>
   <script src="js/transactions.js"></script>

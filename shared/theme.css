@@ -115,7 +115,14 @@ a { color: var(--accent); }
   border-bottom: 3px solid var(--accent);
   position: sticky; top: 0; z-index: 30;
 }
+.topbar-left { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.icon-btn {
+  appearance: none; cursor: pointer; background: transparent; border: none;
+  color: var(--brand-fg); font-size: 20px; line-height: 1; flex: 0 0 auto;
+  padding: 6px 9px; border-radius: 8px;
+}
+.icon-btn:hover { background: rgba(255,255,255,.12); }
 .brand-badge {
   width: 46px; height: 46px; border-radius: 50%; flex: 0 0 auto;
   background: transparent;
@@ -140,6 +147,39 @@ a { color: var(--accent); }
 .topbar .btn-ghost:hover { opacity: 1; color: var(--brand-fg); }
 .topbar .pill, .topbar .draft-summary { color: var(--brand-fg); opacity: .9; }
 .topbar-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+
+/* ---------------- Slide-out menu ---------------- */
+.menu-overlay {
+  position: fixed; inset: 0; z-index: 78; background: rgba(0,0,0,.5);
+  opacity: 0; visibility: hidden; transition: opacity .2s ease, visibility 0s linear .2s;
+}
+.menu-drawer {
+  position: fixed; top: 0; right: 0; bottom: 0; z-index: 79;
+  width: min(84vw, 300px); background: var(--panel); border-left: 3px solid var(--accent);
+  box-shadow: -8px 0 30px rgba(0,0,0,.35);
+  transform: translateX(100%); visibility: hidden;
+  transition: transform .2s ease, visibility 0s linear .2s;
+  display: flex; flex-direction: column; overflow-y: auto;
+}
+body.menu-open .menu-overlay { opacity: 1; visibility: visible; transition: opacity .2s ease; }
+body.menu-open .menu-drawer { transform: translateX(0); visibility: visible; transition: transform .2s ease; }
+.menu-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 16px 10px; border-bottom: 1px solid var(--line);
+}
+.menu-head .icon-btn { color: var(--text); font-size: 15px; }
+.menu-nav { display: flex; flex-direction: column; padding: 8px; gap: 2px; }
+.menu-foot { margin-top: auto; padding: 8px; border-top: 1px solid var(--line); }
+.menu-item {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+  appearance: none; cursor: pointer; font: inherit; font-weight: 700; font-size: 15px;
+  color: var(--text); background: transparent; border: none; border-radius: 10px;
+  padding: 12px 14px; text-decoration: none;
+}
+.menu-item:hover { background: var(--panel-2); }
+.menu-item.on { background: var(--accent); color: var(--on-accent); }
+.menu-item[hidden] { display: none; }
+.league-links { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
 
 /* ---------------- Tabs ---------------- */
 .tabs {
@@ -348,7 +388,8 @@ label { font-size: 13px; color: var(--muted); font-weight: 600; }
    the title. (JS keeps --header-h in sync so the sticky tabs sit below.) */
 @media (max-width: 700px) {
   .topbar { flex-wrap: wrap; padding: 8px 12px; row-gap: 2px; }
-  .brand { flex: 1 1 100%; }
+  .topbar-left { flex: 1 1 100%; }
+  .brand { flex: 1; }
   .topbar-actions {
     flex: 1 1 100%; flex-wrap: nowrap; justify-content: flex-start;
     overflow-x: auto; padding: 4px 0 2px; scrollbar-width: none;
