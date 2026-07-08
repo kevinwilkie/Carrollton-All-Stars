@@ -304,22 +304,27 @@ function renderMyTeam() {
   const rank = myRank();
   const startsUsed = luScore && luScore.startsUsed != null ? luScore.startsUsed : null;
   const weekPts = (luScore && luScore.total) ?? 0;
-  const card =
-    `<div class="card team-card">` +
-    `<div class="tc-main">${avatarHTML({ name: teamName(App.myTeamId) }, 52)}` +
-    `<div class="tc-text"><div class="tc-name">${escapeHtml(teamName(App.myTeamId))}</div>` +
-    `<div class="tc-sub">${teamRecord(App.myTeamId)}${rank ? ` · ${rank}` : ""}` +
-    `${cfgTeam.owner ? ` · ${escapeHtml(cfgTeam.owner)}` : ""}</div></div>` +
-    `<div class="tc-pts"><b>${weekPts}</b><span>${wk ? `Week ${wk.n} pts` : "points"}</span></div></div>` +
-    `<div class="tc-actions">` +
-    `<button class="tc-link" data-goto="schedule">🗓️ Schedule</button>` +
-    `<button class="tc-link" data-goto="trades">🔁 Trade</button>` +
-    `<button class="tc-link" data-goto="transactions">📋 Activity</button>` +
+  const faab = (App.teams[App.myTeamId] || {}).faabRemaining;
+  const statPills =
+    (faab != null ? `<span class="pill pill-live" title="FAAB budget remaining">$${faab} FAAB</span>` : "") +
+    (wk ? `<span class="pill">Week ${wk.n}${wk.type === "playoff" ? " · Playoffs" : ""}</span>` : "") +
     (startsUsed != null
       ? `<span class="pill${startsUsed >= PITCHING.maxStartsPerWeek ? " pill-warn" : ""}" ` +
         `title="Only ${PITCHING.maxStartsPerWeek} pitcher starts count per week">` +
         `${startsUsed}/${PITCHING.maxStartsPerWeek} SP starts</span>`
-      : "") +
+      : "");
+  const card =
+    `<div class="card team-card">` +
+    `<div class="tc-main">${teamAvatarHTML(App.myTeamId, 52)}` +
+    `<div class="tc-text"><div class="tc-name">${escapeHtml(teamName(App.myTeamId))}</div>` +
+    `<div class="tc-sub">${teamRecord(App.myTeamId)}${rank ? ` · ${rank}` : ""}` +
+    `${cfgTeam.owner ? ` · ${escapeHtml(cfgTeam.owner)}` : ""}</div></div>` +
+    `<div class="tc-pts"><b>${weekPts}</b><span>${wk ? `Week ${wk.n} pts` : "points"}</span></div></div>` +
+    (statPills ? `<div class="tc-stats">${statPills}</div>` : "") +
+    `<div class="tc-actions">` +
+    `<button class="tc-link" data-goto="schedule">🗓️ Schedule</button>` +
+    `<button class="tc-link" data-goto="trades">🔁 Trade</button>` +
+    `<button class="tc-link" data-goto="transactions">📋 Activity</button>` +
     `</div></div>`;
 
   // ---- Date navigation (yesterday … +7 days) + auto-start ----

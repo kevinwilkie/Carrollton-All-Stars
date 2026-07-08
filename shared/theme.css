@@ -179,6 +179,7 @@ body.menu-open .menu-drawer { transform: translateX(0); visibility: visible; tra
 .menu-item:hover { background: var(--panel-2); }
 .menu-item.on { background: var(--accent); color: var(--on-accent); }
 .menu-item[hidden] { display: none; }
+.menu-sep { height: 1px; background: var(--line); margin: 8px 10px; }
 .league-links { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
 
 /* ---------------- Tabs ---------------- */

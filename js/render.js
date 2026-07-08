@@ -16,6 +16,7 @@ const RENDERERS = {
   schedule: () => renderSchedule(),
   keepers: () => renderKeepers(),
   admin: () => renderAdmin(),
+  settings: () => renderSettings(),
 };
 
 function setTab(name) {
@@ -61,28 +62,16 @@ function errorCard(key) {
     `<button class="btn" data-retry="${key}">Retry</button></div>`;
 }
 
-// Topbar pills: current week + my FAAB; role badge.
-function renderShell() {
-  const wk = currentWeek();
-  const wp = $("#week-pill");
-  wp.hidden = !wk;
-  if (wk) wp.textContent = `Week ${wk.n}${wk.type === "playoff" ? " · Playoffs" : ""}`;
-  const fp = $("#faab-pill");
-  const faab = App.myTeamId && App.teams[App.myTeamId] ? App.teams[App.myTeamId].faabRemaining : null;
-  fp.hidden = faab == null;
-  if (faab != null) fp.textContent = `$${faab} FAAB`;
-}
+// FAAB, week, and the role/account now live in the My Team card and Settings,
+// so the header itself has nothing dynamic to refresh.
+function renderShell() {}
 
 function applyRole() {
-  const badge = $("#role-badge");
-  const authBtn = $("#btn-auth");
   const gate = $("#gate");
   $("#menu-admin").hidden = Auth.role !== "commish";
 
   if (Auth.role === "local") {
     gate.hidden = true;
-    badge.hidden = true;
-    authBtn.hidden = true;
     renderActive();
     return;
   }
@@ -93,30 +82,17 @@ function applyRole() {
       ? `${Auth.user.email} isn't registered to a team in this league. Try another account, or ask the commissioner to add you.`
       : "Sign in with the Google account your team is registered under.";
     $("#gate-signout").hidden = !Auth.user;
-    badge.hidden = true;
-    authBtn.textContent = "Sign in";
     return;
   }
 
   // owner / commish
   gate.hidden = true;
   App.myTeamId = Auth.teamId;
-  badge.hidden = false;
-  if (Auth.role === "commish") {
-    badge.textContent = "✎ Commissioner";
-    badge.className = "role-badge role-commish";
-  } else {
-    badge.textContent = teamName(App.myTeamId);
-    badge.className = "role-badge role-owner";
-  }
-  authBtn.textContent = "Sign out";
   subscribeCore();
-  renderShell();
   renderActive();
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  wireThemeButton($("#btn-theme"));
   trackHeaderHeight();
   // Retry a failed view load: clear its error and re-render (the loader re-runs).
   document.addEventListener("click", (e) => {
@@ -132,9 +108,6 @@ document.addEventListener("DOMContentLoaded", () => {
   $("#menu-close").addEventListener("click", closeMenu);
   $("#menu-overlay").addEventListener("click", closeMenu);
   $$(".menu-item[data-tab]").forEach((b) => b.addEventListener("click", () => setTab(b.dataset.tab)));
-  $("#btn-auth").addEventListener("click", () => {
-    if (Auth.user) signOutUser(); else signInGoogle();
-  });
   $("#gate-signin").addEventListener("click", signInGoogle);
   $("#gate-signout").addEventListener("click", signOutUser);
   wireClaimModal();

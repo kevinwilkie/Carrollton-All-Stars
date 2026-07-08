@@ -95,7 +95,7 @@ test("season app: every view renders in local mode with no JS errors", async () 
   const errs = watch(page);
   await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
   assert.ok((await page.title()).includes("Fantasy Baseball"));
-  for (const tab of ["league", "matchup", "scoreboard", "standings", "players", "trades", "transactions", "schedule", "keepers"]) {
+  for (const tab of ["league", "matchup", "scoreboard", "standings", "players", "trades", "transactions", "schedule", "keepers", "settings"]) {
     await page.evaluate((t) => setTab(t), tab);
     assert.ok((await page.innerHTML(`#view-${tab}`)).length > 10, `${tab} renders`);
   }
@@ -161,6 +161,32 @@ test("Players tab: free agents sort by season points and open a card", async () 
   await page.evaluate(() => document.querySelector("#view-players [data-card]").click());
   await page.waitForTimeout(150);
   assert.ok(await page.evaluate(() => !!document.querySelector("#mt-sheet .pc-head")));
+  assert.deepEqual(realErrors(errs), []);
+  await page.close();
+});
+
+test("settings: theme toggle + team profile editor, header has no stray controls", async () => {
+  const page = await browser.newPage();
+  const errs = watch(page);
+  await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
+  // the old header pills/links/theme button are gone
+  assert.equal(await page.locator("#faab-pill, #week-pill, #btn-auth, #role-badge").count(), 0);
+  await seedSeason(page);
+  await page.evaluate(() => setTab("settings"));
+  await page.waitForTimeout(150);
+  assert.ok(await page.evaluate(() => !!document.querySelector("#view-settings #btn-theme")), "theme toggle in settings");
+  assert.ok(await page.evaluate(() => !!document.querySelector("#view-settings #set-name")), "team name editor");
+  // theme toggle flips the data-theme attribute
+  const before = await page.evaluate(() => document.documentElement.dataset.theme);
+  await page.click("#view-settings #btn-theme");
+  const after = await page.evaluate(() => document.documentElement.dataset.theme);
+  assert.notEqual(before, after);
+  // saving the team profile calls the API
+  await page.evaluate(() => { window.__profile = null; window.saveTeamProfile = async (p) => { window.__profile = p; }; });
+  await page.fill("#view-settings #set-name", "New Name");
+  await page.click("#view-settings #set-save");
+  await page.waitForTimeout(100);
+  assert.equal(await page.evaluate(() => window.__profile && window.__profile.name), "New Name");
   assert.deepEqual(realErrors(errs), []);
   await page.close();
 });

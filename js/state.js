@@ -31,6 +31,21 @@ function teamName(teamId) {
   return (App.teams[teamId] && App.teams[teamId].name) ||
     (LEAGUE_TEAMS.find((t) => t.id === teamId) || {}).name || teamId || "—";
 }
+
+// Team avatar: the owner-set logo image if present, else initials on an
+// optional custom color. Used by the My Team card and Settings preview.
+function teamAvatarHTML(teamId, size) {
+  const t = App.teams[teamId] || {};
+  const name = teamName(teamId);
+  if (t.logoUrl) {
+    return `<span class="avatar has-photo" style="--sz:${size}px">` +
+      `<img src="${escapeHtml(t.logoUrl)}" alt="" ` +
+      `onerror="this.remove();this.closest('.avatar').classList.remove('has-photo')"></span>`;
+  }
+  const bg = t.avatarColor ? `;background:${escapeHtml(t.avatarColor)}` : "";
+  return `<span class="avatar" style="--sz:${size}px${bg}">` +
+    `<span class="avatar-initials">${escapeHtml(initialsOf(name))}</span></span>`;
+}
 function teamRecord(teamId) {
   const r = (App.teams[teamId] || {}).record || {};
   return `${r.w || 0}-${r.l || 0}${r.t ? "-" + r.t : ""}`;

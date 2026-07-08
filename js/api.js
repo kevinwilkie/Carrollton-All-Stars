@@ -208,6 +208,14 @@ async function vetoTrade(id, on) {
   });
 }
 
+// Owner-editable team profile (name / picture / slogan). The security rules
+// restrict this to your own team and to just these display fields.
+async function saveTeamProfile(patch) {
+  if (!App.myTeamId) throw new Error("No team to edit.");
+  await L().collection("teams").doc(App.myTeamId).set(
+    { ...patch, updatedAt: new Date().toISOString() }, { merge: true });
+}
+
 async function saveKeeperDeclaration(season, entries) {
   await L().collection("keepers").doc(`${season}_${App.myTeamId}`).set({
     teamId: App.myTeamId, season, entries, updatedAt: new Date().toISOString(),

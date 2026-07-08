@@ -34,7 +34,15 @@
 .tc-pts { text-align: right; flex: 0 0 auto; }
 .tc-pts b { display: block; font-size: 24px; font-weight: 900; line-height: 1; }
 .tc-pts span { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); }
+.tc-stats { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
 .tc-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+
+/* Settings — team profile preview + form */
+.set-team-preview { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.set-team-preview b { font-size: 16px; }
+.set-fields { display: flex; flex-direction: column; gap: 4px; }
+.set-fields label { margin-top: 8px; }
+.set-fields input { width: 100%; }
 .tc-link {
   appearance: none; cursor: pointer; font: inherit; font-weight: 700; font-size: 13px;
   background: var(--panel-2); color: var(--text); border: 1px solid var(--line);

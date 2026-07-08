@@ -53,7 +53,16 @@ service cloud.firestore {
 
       // ---- League-readable, function/commish-written collections ----
       match /config/{doc}       { allow read: if isOwner(); }
-      match /teams/{doc}        { allow read: if isOwner(); }
+
+      // Teams: league-readable; an owner may edit ONLY their own team's display
+      // fields (name / picture / slogan) — never record, FAAB, seed, or emails.
+      match /teams/{teamId} {
+        allow read: if isOwner();
+        allow update: if ownsTeam(teamId) &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['name', 'logoUrl', 'slogan', 'avatarColor', 'updatedAt']);
+      }
+
       match /rosters/{doc}      { allow read: if isOwner(); }
       match /players/{doc}      { allow read: if isOwner(); }
       match /scores/{doc}       { allow read: if isOwner(); }

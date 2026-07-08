@@ -22,14 +22,6 @@
         </div>
       </div>
     </div>
-    <div class="topbar-actions">
-      <button id="btn-theme" class="btn btn-ghost" title="Switch between the Classic dark and Vintage logo themes"></button>
-      <span id="week-pill" class="pill" hidden></span>
-      <span id="faab-pill" class="pill" hidden title="FAAB budget remaining"></span>
-      <a class="btn btn-ghost" href="draft/" title="The live auction draft board">🧢 Draft Board</a>
-      <span id="role-badge" class="role-badge" hidden></span>
-      <button id="btn-auth" class="btn">Sign in</button>
-    </div>
   </header>
 
   <nav class="tabs" id="tabs">
@@ -54,6 +46,8 @@
       <button class="menu-item" data-tab="trades">🔁 Trades</button>
       <button class="menu-item" data-tab="keepers">🧢 Keepers</button>
       <button class="menu-item" id="menu-admin" data-tab="admin" hidden>✎ Admin</button>
+      <div class="menu-sep"></div>
+      <button class="menu-item" data-tab="settings">⚙️ Settings</button>
     </nav>
     <div class="menu-foot">
       <a class="menu-item" href="draft/">🧢 Draft Board</a>
@@ -72,6 +66,7 @@
     <section class="view" id="view-schedule" hidden></section>
     <section class="view" id="view-keepers" hidden></section>
     <section class="view" id="view-admin" hidden></section>
+    <section class="view" id="view-settings" hidden></section>
   </main>
 
   <!-- Sign-in gate (Frankford pattern): shown until a league account resolves -->
@@ -162,6 +157,7 @@
   <script src="js/schedule.js"></script>
   <script src="js/keepers.js"></script>
   <script src="js/admin.js"></script>
+  <script src="js/settings.js"></script>
   <script src="js/render.js"></script>
 </body>
 </html>
