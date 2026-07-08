@@ -32,15 +32,23 @@ export async function ensureLineups(date) {
     const ref = L.collection("lineups").doc(`${t.id}_${date}`);
     if ((await ref.get()).exists) continue;
 
+    // The current roster — copied-forward slots for players no longer on it
+    // (traded, dropped, waived away) are cleared so they don't propagate as
+    // phantom starters that hold an active slot but can never score.
+    const roster = (await L.collection("rosters").doc(t.id).get()).data() || {};
+    const onRoster = new Set(Object.entries(roster.players || {}).map(([key, p]) => String(p.mlbId || key)));
+
     // Copy the most recent lineup within the last 10 days.
     let slots = null;
     for (let back = 1; back <= 10 && !slots; back++) {
       const prev = await L.collection("lineups").doc(`${t.id}_${addDays(date, -back)}`).get();
       if (prev.exists) slots = prev.data().slots || null;
     }
-    if (!slots) {
+    if (slots) {
+      slots = Object.fromEntries(Object.entries(slots).map(([slot, id]) =>
+        [slot, id && onRoster.has(String(id)) ? id : null]));
+    } else {
       // First lineup ever: auto-build from the published roster.
-      const roster = (await L.collection("rosters").doc(t.id).get()).data() || {};
       const players = Object.entries(roster.players || {}).map(([key, p]) => ({
         mlbId: p.mlbId || key, positions: p.positions || [],
       }));

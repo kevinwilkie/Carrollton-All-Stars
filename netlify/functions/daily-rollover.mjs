@@ -33,7 +33,15 @@ export default async () => {
   };
 
   await step("finalIngest", () => ingestDate(yesterday));
-  await step("weekFinalized", () => finalizeWeekIfEnded(yesterday));
+  // Don't finalize the week off a pass that lost box scores — a missing game
+  // would settle wrong W/L. Defer; finalize now accepts end <= yesterday, so
+  // tomorrow's rollover (with the box score back) settles it.
+  const fi = out.finalIngest || {};
+  if (!fi.error && !(fi.failed && fi.failed.length)) {
+    await step("weekFinalized", () => finalizeWeekIfEnded(yesterday));
+  } else {
+    out.weekFinalized = { deferred: fi.error ? "ingest error" : `${fi.failed.length} box score(s) failed` };
+  }
   await step("waivers", () => processClaims(today));
   await step("expiredClaims", () => expireStaleClaims(today));
   await step("playersSynced", () => syncPlayers(yesterday, season));

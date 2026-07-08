@@ -5,14 +5,35 @@
  */
 import { db, leagueRef } from "./firebase.mjs";
 import { CFG } from "./league.mjs";
+import { isCalledOff } from "./ingest.mjs";
 
+// A scoring day is "settled" once every one of its MLB games is Final or
+// called off — i.e. no result can still change. Missing/empty day = off day.
+async function dayComplete(L, date) {
+  const snap = await L.collection("mlbdays").doc(date).get();
+  if (!snap.exists) return true;
+  const games = snap.data().games || [];
+  return games.every((g) => g.status === "Final" || isCalledOff(g));
+}
+
+// Finalize the EARLIEST ended-but-unfinalized week whose last day has fully
+// settled. Keying on `end <= yesterday` (not `=== yesterday`) means a week we
+// deferred because a late game was still live simply finalizes on the next
+// rollover instead of locking wrong W/L. Idempotent: already-final weeks skip.
 export async function finalizeWeekIfEnded(yesterday) {
   const L = leagueRef();
   const settings = (await L.collection("config").doc("settings").get()).data() || {};
-  const week = (settings.weeks || []).find((w) => w.end === yesterday);
-  if (!week) return null;
+  const ended = (settings.weeks || []).filter((w) => w.end <= yesterday).sort((a, b) => a.n - b.n);
 
-  const muSnap = await L.collection("matchups").where("week", "==", week.n).get();
+  let week = null, muSnap = null;
+  for (const w of ended) {
+    const ms = await L.collection("matchups").where("week", "==", w.n).get();
+    if (ms.empty) continue;                                  // playoff week not seeded yet
+    if (ms.docs.every((d) => d.data().final)) continue;      // already finalized
+    if (!(await dayComplete(L, w.end))) return null;         // a game is still live → defer
+    week = w; muSnap = ms; break;
+  }
+  if (!week) return null;
   const teamsSnap = await L.collection("teams").get();
   const teams = {};
   teamsSnap.forEach((d) => { teams[d.id] = d.data(); });

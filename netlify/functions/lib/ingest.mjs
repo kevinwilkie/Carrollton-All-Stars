@@ -42,10 +42,24 @@ export async function ensureMlbDay(date, { refresh = false } = {}) {
   return games;
 }
 
+// A game that won't actually be played today: postponed, cancelled, or
+// suspended-before-resumption. Its clubs must NOT lock rosters — the game
+// doesn't count, so owners keep those players swappable and they score 0.
+export function isCalledOff(g) {
+  const ds = (g.detailedState || "").toLowerCase();
+  return ds.includes("postpon") || ds.includes("cancel") ||
+    ds.includes("suspend") || ds.includes("forfeit");
+}
+
 // ---- lineup-lock snapshots -----------------------------------------------------
-// For every game whose first pitch has passed, freeze each fantasy team's
+// For every game that has actually kicked off, freeze each fantasy team's
 // current slot for the players on those MLB clubs. Scoring reads ONLY the
 // locked map, so later client edits of a locked player are inert.
+//
+// Doubleheaders lock at the club level (both games share the same two clubs):
+// once the club's FIRST game starts, all its players lock. That's intentional
+// and standard for daily lineups — you can't know pre-game which game of a DH
+// a player will appear in, so the earliest game is the safe lock point.
 export async function snapshotLocks(date) {
   const L = leagueRef();
   const dayRef = L.collection("mlbdays").doc(date);
@@ -53,15 +67,19 @@ export async function snapshotLocks(date) {
   if (!daySnap.exists) return 0;
   const games = daySnap.data().games || [];
   const nowIso = new Date().toISOString();
-  const started = games.filter((g) => g.firstPitchUTC && g.firstPitchUTC <= nowIso && !g.locksDone);
+  const started = games.filter((g) =>
+    g.firstPitchUTC && g.firstPitchUTC <= nowIso && !g.locksDone && !isCalledOff(g));
   if (!started.length) return 0;
 
   const startedClubs = new Set();
   started.forEach((g) => { startedClubs.add(g.homeId); startedClubs.add(g.awayId); });
 
+  // Current club AND owner of each rostered player, so a player traded/dropped
+  // before his game starts can't lock (and therefore can't score) for a team
+  // that no longer holds him.
   const playersSnap = await L.collection("players").where("rosteredBy", "!=", null).get();
-  const clubOf = {};
-  playersSnap.forEach((d) => { clubOf[d.id] = d.data().mlbTeamId; });
+  const clubOf = {}, rosterOf = {};
+  playersSnap.forEach((d) => { clubOf[d.id] = d.data().mlbTeamId; rosterOf[d.id] = d.data().rosteredBy; });
 
   const batch = db().batch();
   for (const t of CFG.LEAGUE_TEAMS) {
@@ -75,7 +93,7 @@ export async function snapshotLocks(date) {
       if (!mlbId) return;
       const id = String(mlbId);
       if (locked[id]) return;
-      if (startedClubs.has(clubOf[id])) { locked[id] = slot; changed = true; }
+      if (startedClubs.has(clubOf[id]) && rosterOf[id] === t.id) { locked[id] = slot; changed = true; }
     });
     if (changed) batch.set(lref, { locked }, { merge: true });
   }
@@ -89,17 +107,25 @@ export async function snapshotLocks(date) {
 export async function ingestStatlines(date, games) {
   const L = leagueRef();
   const playable = games.filter((g) => g.status === "Live" || g.status === "Final");
-  if (!playable.length) return 0;
+  if (!playable.length) return { count: 0, failed: [] };
 
-  // Merge doubleheaders: one statline per player per ET date.
+  // Merge doubleheaders: one statline per player per ET date. Use allSettled so
+  // one game's boxscore failing (a flaky MLB API call) doesn't discard the whole
+  // slate — we ingest the games that succeeded and report the ones that didn't.
   const byPlayer = {};
-  const results = await Promise.all(playable.map(async (g) => {
+  const settled = await Promise.allSettled(playable.map(async (g) => {
     const [box, decisions] = await Promise.all([
       MLB.boxscore(g.gamePk),
       g.status === "Final" ? MLB.gameDecisions(g.gamePk) : Promise.resolve({}),
     ]);
     return { g, lines: MLB.extractStatLines(box, decisions) };
   }));
+  const failed = [];
+  const results = [];
+  settled.forEach((r, i) => {
+    if (r.status === "fulfilled") results.push(r.value);
+    else { failed.push(playable[i].gamePk); console.error(`boxscore failed for gamePk ${playable[i].gamePk}:`, r.reason && r.reason.message || r.reason); }
+  });
   const finalFor = {}; // mlbId -> all of that player's games today are Final
   results.forEach(({ g, lines }) => {
     Object.entries(lines).forEach(([id, line]) => {
@@ -129,7 +155,7 @@ export async function ingestStatlines(date, games) {
     });
     await batch.commit();
   }
-  return entries.length;
+  return { count: entries.length, failed };
 }
 
 function sumStats(a, b) {
@@ -263,9 +289,9 @@ export async function recomputeScores(date) {
 // One full pass for a date: schedule refresh → locks → stats → scores.
 export async function ingestDate(date) {
   const games = await ensureMlbDay(date, { refresh: true });
-  if (!games.length) return { date, games: 0, statlines: 0 };
+  if (!games.length) return { date, games: 0, statlines: 0, failed: [] };
   const locked = await snapshotLocks(date);
-  const statlines = await ingestStatlines(date, games);
-  if (statlines) await recomputeScores(date);
-  return { date, games: games.length, locked, statlines };
+  const { count, failed } = await ingestStatlines(date, games);
+  if (count) await recomputeScores(date);
+  return { date, games: games.length, locked, statlines: count, failed };
 }

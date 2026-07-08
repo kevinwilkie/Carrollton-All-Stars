@@ -5,7 +5,7 @@
  * swap. The commissioner can force/veto from the Admin tab at any time.
  */
 import { db, leagueRef } from "./firebase.mjs";
-import { CFG } from "./league.mjs";
+import { CFG, etDate } from "./league.mjs";
 
 export async function processTrades() {
   const L = leagueRef();
@@ -72,6 +72,31 @@ export async function executeTrade(t) {
 
   batch.set(fromRef, { players: from.players, updatedAt: now }, { merge: true });
   batch.set(toRef, { players: to.players, updatedAt: now }, { merge: true });
+
+  // Clear each side's departed players from TODAY's lineup so the losing team
+  // isn't left with a phantom in an active slot. (Scoring reads the `locked`
+  // map, not `slots`, so a player already locked from an earlier game keeps his
+  // points — this only frees the open slot going forward.)
+  const today = etDate();
+  await clearFromLineup(L, batch, t.from, gives, today);
+  await clearFromLineup(L, batch, t.to, gets, today);
+
   await batch.commit();
   return { ok: true };
+}
+
+async function clearFromLineup(L, batch, teamId, ids, date) {
+  if (!ids.length) return;
+  const lref = L.collection("lineups").doc(`${teamId}_${date}`);
+  const lsnap = await lref.get();
+  if (!lsnap.exists) return;
+  const slots = lsnap.data().slots || {};
+  const gone = new Set(ids.map(String));
+  let changed = false;
+  const next = {};
+  for (const [slot, pid] of Object.entries(slots)) {
+    if (pid && gone.has(String(pid))) { next[slot] = null; changed = true; }
+    else next[slot] = pid;
+  }
+  if (changed) batch.set(lref, { slots: next }, { merge: true });
 }
