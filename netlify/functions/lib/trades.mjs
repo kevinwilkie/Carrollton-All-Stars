@@ -4,7 +4,7 @@
  * fewer than 6 vetoes (majority of the 10 uninvolved owners), the rosters
  * swap. The commissioner can force/veto from the Admin tab at any time.
  */
-import { db, leagueRef } from "./firebase.mjs";
+import { db, leagueRef, admin } from "./firebase.mjs";
 import { CFG, etDate } from "./league.mjs";
 
 export async function processTrades() {
@@ -15,7 +15,16 @@ export async function processTrades() {
 
   for (const d of snap.docs) {
     const t = d.data();
-    if (!t.reviewEndsAt || t.reviewEndsAt > now) continue;
+    // Server-authoritative review window: stamp the deadline the first tick we
+    // see the trade accepted, then defer. A colluding recipient can set any
+    // reviewEndsAt on the client, so we must NOT trust it — otherwise a past
+    // value would let the trade skip the league's veto period entirely.
+    if (!t.serverReviewEndsAt) {
+      const end = new Date(Date.parse(now) + CFG.TRADE.reviewHours * 3600e3).toISOString();
+      await d.ref.set({ serverReviewEndsAt: end }, { merge: true });
+      continue;
+    }
+    if (t.serverReviewEndsAt > now) continue;
 
     // Count only uninvolved owners' vetoes (the rules already bar the two
     // participants from writing one, but be defensive against stale data).
@@ -60,12 +69,20 @@ export async function executeTrade(t) {
   if (toAfter > MAX) return { ok: false, note: `${t.to} would exceed the ${MAX}-player roster limit.` };
 
   const batch = db().batch();
+  const del = admin.firestore.FieldValue.delete();
+  const path = (id) => new admin.firestore.FieldPath("players", id);
   const log = (entry) => batch.set(L.collection("transactions").doc(), { ...entry, at: now });
 
+  // Write only the traded keys (per-field delete on the giver, per-field merge
+  // on the receiver) rather than overwriting the whole `players` map. A
+  // concurrent drop/waiver touching a DIFFERENT player on the same roster then
+  // can't be clobbered by this trade (no whole-map lost update).
   gives.forEach((id) => {
     const p = from.players[id];
     delete from.players[id];
     to.players[id] = { ...p, via: "trade" };
+    batch.update(fromRef, path(id), del);
+    batch.set(toRef, { players: { [id]: { ...p, via: "trade" } } }, { merge: true });
     batch.set(L.collection("players").doc(id), { rosteredBy: t.to }, { merge: true });
     log({ type: "trade", mlbId: id, name: p.name || "", fromTeam: t.from, toTeam: t.to });
   });
@@ -73,12 +90,14 @@ export async function executeTrade(t) {
     const p = to.players[id];
     delete to.players[id];
     from.players[id] = { ...p, via: "trade" };
+    batch.update(toRef, path(id), del);
+    batch.set(fromRef, { players: { [id]: { ...p, via: "trade" } } }, { merge: true });
     batch.set(L.collection("players").doc(id), { rosteredBy: t.from }, { merge: true });
     log({ type: "trade", mlbId: id, name: p.name || "", fromTeam: t.to, toTeam: t.from });
   });
 
-  batch.set(fromRef, { players: from.players, updatedAt: now }, { merge: true });
-  batch.set(toRef, { players: to.players, updatedAt: now }, { merge: true });
+  batch.set(fromRef, { updatedAt: now }, { merge: true });
+  batch.set(toRef, { updatedAt: now }, { merge: true });
 
   // Clear each side's departed players from TODAY's lineup so the losing team
   // isn't left with a phantom in an active slot. (Scoring reads the `locked`

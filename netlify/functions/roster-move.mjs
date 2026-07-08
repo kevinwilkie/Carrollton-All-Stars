@@ -65,7 +65,10 @@ export default async (req) => {
   delete roster.players[key];
 
   const batch = db().batch();
-  batch.set(rref, { players: roster.players, updatedAt: now }, { merge: true });
+  // Delete only this player's key (not a whole-map rewrite) so a concurrent
+  // trade/waiver touching another player on the same roster isn't clobbered.
+  batch.update(rref, new admin.firestore.FieldPath("players", key), admin.firestore.FieldValue.delete());
+  batch.set(rref, { updatedAt: now }, { merge: true });
   batch.set(L.collection("players").doc(String(mlbId)), { rosteredBy: null }, { merge: true });
 
   // Free the slot in today's lineup so it isn't left as a phantom starter.

@@ -40,8 +40,9 @@ function renderTrades() {
     if (t.status === "accepted" && !involved && App.myTeamId)
       actions = `<button class="btn ${myVeto ? "" : "btn-ghost"} btn-small" data-veto="${t.id}" data-on="${myVeto ? "" : "1"}">` +
         `${myVeto ? "✓ Vetoed — undo" : "Veto"}</button>`;
-    const review = t.status === "accepted" && t.reviewEndsAt
-      ? `<span class="pill pill-warn countdown">review ends ${new Date(t.reviewEndsAt).toLocaleString()} · vetoes ${vetoes}/${TRADE.vetoesNeeded}</span>`
+    const reviewEnds = t.serverReviewEndsAt || t.reviewEndsAt; // server value wins once stamped
+    const review = t.status === "accepted" && reviewEnds
+      ? `<span class="pill pill-warn countdown">review ends ${new Date(reviewEnds).toLocaleString()} · vetoes ${vetoes}/${TRADE.vetoesNeeded}</span>`
       : "";
     const statusPill = { proposed: "pill", accepted: "pill pill-warn", executed: "pill pill-live",
       vetoed: "pill pill-bad", rejected: "pill pill-bad", withdrawn: "pill", failed: "pill pill-bad" }[t.status] || "pill";
