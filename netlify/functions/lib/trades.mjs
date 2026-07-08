@@ -52,6 +52,13 @@ export async function executeTrade(t) {
   for (const id of gives) if (!from.players[id]) return { ok: false, note: `Player ${id} no longer on ${t.from}.` };
   for (const id of gets) if (!to.players[id]) return { ok: false, note: `Player ${id} no longer on ${t.to}.` };
 
+  // Uneven trades change roster sizes — neither side may end over the cap.
+  const MAX = CFG.ROSTER_SIZE + CFG.IL_SLOTS;
+  const fromAfter = Object.keys(from.players).length - gives.length + gets.length;
+  const toAfter = Object.keys(to.players).length - gets.length + gives.length;
+  if (fromAfter > MAX) return { ok: false, note: `${t.from} would exceed the ${MAX}-player roster limit.` };
+  if (toAfter > MAX) return { ok: false, note: `${t.to} would exceed the ${MAX}-player roster limit.` };
+
   const batch = db().batch();
   const log = (entry) => batch.set(L.collection("transactions").doc(), { ...entry, at: now });
 

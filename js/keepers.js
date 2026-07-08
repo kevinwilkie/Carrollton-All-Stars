@@ -21,12 +21,20 @@ async function ensureKeeperData() {
   renderActive();
 }
 
+// Consecutive seasons this player has ALREADY been kept (incl. this one). Set
+// when keepers are applied at the draft; fall back to inferring 1 from a
+// `via:"keeper"` acquisition for rosters that predate the counter.
+function keptYearsOf(p) {
+  return p.keeperYears != null ? p.keeperYears : (p.via === "keeper" ? 1 : 0);
+}
+
 function keeperCostOf(p) {
-  // via draft/keeper at $X → next year $X+5; via faab/undrafted → flat $5.
-  if (p.via === "faab") return { cost: KEEPER.undraftedPrice, formula: `FAAB pickup → flat $${KEEPER.undraftedPrice}` };
-  const yearsKept = p.via === "keeper" ? 1 : 0; // kept this season already?
-  if (yearsKept >= 1) return { cost: null, formula: "Year 2 → ESPN avg salary at the deadline" };
-  return { cost: (p.price || 0) + KEEPER.y1Inflation, formula: `$${p.price || 0} + $${KEEPER.y1Inflation}` };
+  const ky = keptYearsOf(p);
+  if (ky >= 2) return { eligible: false, cost: null, formula: "Kept 2 straight years — not eligible" };
+  if (ky >= 1) return { eligible: true, cost: null, formula: "Year 2 → ESPN avg salary at the deadline (final year)" };
+  if (p.via === "faab" || p.via === "undrafted")
+    return { eligible: true, cost: KEEPER.undraftedPrice, formula: `Pickup → flat $${KEEPER.undraftedPrice}` };
+  return { eligible: true, cost: (p.price || 0) + KEEPER.y1Inflation, formula: `Year 1 → $${p.price || 0} + $${KEEPER.y1Inflation}` };
 }
 
 function renderKeepers() {
@@ -36,44 +44,56 @@ function renderKeepers() {
   if (!kpRoster) { ensureKeeperData(); return host.innerHTML = `<div class="empty-note">Loading…</div>`; }
 
   const declared = new Set(((kpDecl && kpDecl.entries) || []).map((e) => String(e.mlbId)));
+  const locked = etDate() > KEEPER.espnDeadline;   // declarations freeze at the deadline
   const players = Object.values(kpRoster.players || {})
     .sort((a, b) => (b.price || 0) - (a.price || 0));
 
   const rows = players.map((p) => {
     const k = keeperCostOf(p);
     const on = declared.has(String(p.mlbId));
-    const wasKept = p.via === "keeper";
-    return `<div class="row keeper-row">${avatarHTML(p, 30)}` +
-      `<span class="grow"><span class="pl-name">${escapeHtml(p.name)}` +
-      `${wasKept ? ` <span class="kept-badge y2" style="border:1px solid var(--gold);color:var(--gold);border-radius:999px;font-size:10px;padding:1px 7px">kept this yr</span>` : ""}</span>` +
-      `<span class="sub">${(p.positions || []).join("/")} · acquired via ${escapeHtml(p.via || "draft")} ($${p.price || 0})` +
+    const ky = keptYearsOf(p);
+    const badge = ky >= 2
+      ? `<span class="kept-badge" style="border:1px solid var(--bad);color:var(--bad);border-radius:999px;font-size:10px;padding:1px 7px">ineligible</span>`
+      : ky === 1
+        ? `<span class="kept-badge" style="border:1px solid var(--gold);color:var(--gold);border-radius:999px;font-size:10px;padding:1px 7px">Y2 next</span>`
+        : "";
+    const disabled = !k.eligible || locked || (!on && declared.size >= KEEPER.max);
+    const label = !k.eligible ? "Not eligible" : on ? "✓ Keeping" : "Keep";
+    return `<div class="row keeper-row${!k.eligible ? " dim" : ""}">${avatarHTML(p, 30)}` +
+      `<span class="grow"><span class="pl-name">${escapeHtml(p.name)} ${badge}</span>` +
+      `<span class="sub">${(p.positions || []).join("/")} · via ${escapeHtml(p.via || "draft")} ($${p.price || 0})` +
       ` · ${escapeHtml(k.formula)}</span></span>` +
-      `<span class="cost">${k.cost != null ? "$" + k.cost : "ESPN avg"}</span>` +
-      `<button class="btn btn-small btn-ghost keeper-declare${on ? " on" : ""}" data-keep="${p.mlbId}" data-name="${escapeHtml(p.name)}">` +
-      `${on ? "✓ Keeping" : "Keep"}</button></div>`;
+      `<span class="cost">${k.cost != null ? "$" + k.cost : k.eligible ? "ESPN avg" : "—"}</span>` +
+      `<button class="btn btn-small btn-ghost keeper-declare${on ? " on" : ""}" ${disabled ? "disabled" : ""} ` +
+      `data-keep="${p.mlbId}">${label}</button></div>`;
   }).join("") || `<div class="empty-note">No players on your roster yet.</div>`;
 
   host.innerHTML =
     `<div class="view-head"><h2>Keepers · ${LEAGUE.season + 1}</h2>` +
     `<span class="pill${declared.size > KEEPER.max ? " pill-bad" : ""}">${declared.size}/${KEEPER.max} declared</span></div>` +
     `<p class="hint">Declare up to ${KEEPER.max} keepers for next season. Year 1 = this year's price + $${KEEPER.y1Inflation} ` +
-    `($${KEEPER.undraftedPrice} for pickups); Year 2 = ESPN average salary, and it's the final year. ` +
+    `($${KEEPER.undraftedPrice} for pickups); Year 2 = ESPN average salary (final year — no 3rd straight). ` +
     `Deadline: ${KEEPER.espnDeadline}.</p>` +
+    (locked ? `<p class="hint" style="color:var(--warn)">🔒 The ${KEEPER.espnDeadline} deadline has passed — declarations are locked.</p>` : "") +
     `<div class="card">${rows}</div>`;
 
-  host.querySelectorAll("[data-keep]").forEach((b) =>
+  host.querySelectorAll("[data-keep]:not([disabled])").forEach((b) =>
     b.addEventListener("click", async () => {
+      if (locked) return toast("The keeper deadline has passed.", "error");
       const id = b.dataset.keep;
+      const p = Object.values(kpRoster.players).find((x) => String(x.mlbId) === id);
       const next = new Set(declared);
       if (next.has(id)) next.delete(id);
       else {
+        if (p && !keeperCostOf(p).eligible) return toast(`${p.name} can't be kept a 3rd straight year.`, "error");
         if (next.size >= KEEPER.max) return toast(`Max ${KEEPER.max} keepers.`, "error");
         next.add(id);
       }
       const entries = [...next].map((mlbId) => {
-        const p = Object.values(kpRoster.players).find((x) => String(x.mlbId) === mlbId);
-        const k = p ? keeperCostOf(p) : { cost: null };
-        return { mlbId, name: p ? p.name : "", price: p ? p.price || 0 : 0, plannedCost: k.cost };
+        const pp = Object.values(kpRoster.players).find((x) => String(x.mlbId) === mlbId);
+        const k = pp ? keeperCostOf(pp) : { cost: null };
+        return { mlbId, name: pp ? pp.name : "", price: pp ? pp.price || 0 : 0,
+          keptYears: pp ? keptYearsOf(pp) : 0, plannedCost: k.cost };
       });
       try {
         await saveKeeperDeclaration(LEAGUE.season + 1, entries);

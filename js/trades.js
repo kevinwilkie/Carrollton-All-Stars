@@ -7,6 +7,8 @@
 
 let trGives = new Set();
 let trGets = new Set();
+let trMineCount = 0, trTheirCount = 0;   // current roster sizes (for the cap check)
+const TRADE_MAX = ROSTER_SIZE + IL_SLOTS;
 
 function renderTrades() {
   const host = $("#view-trades");
@@ -92,6 +94,8 @@ async function refreshTradeLists() {
   const [mine, theirs] = await Promise.all([
     loadRoster(App.myTeamId, true), loadRoster(partner, true),
   ]);
+  trMineCount = Object.keys(mine.players || {}).length;
+  trTheirCount = Object.keys(theirs.players || {}).length;
   const list = (rosterDoc, chosen, attr) =>
     Object.values(rosterDoc.players || {})
       .sort((a, b) => (a.name || "").localeCompare(b.name || ""))
@@ -116,6 +120,12 @@ function wireTradeModal() {
     e.preventDefault();
     const err = (m) => { const el = $("#trade-error"); el.textContent = m; el.hidden = false; };
     if (!trGives.size && !trGets.size) return err("Pick at least one player on either side.");
+    // Uneven trades change roster sizes — block anything that would leave
+    // either side over the 30-player cap (the server enforces this too).
+    const myAfter = trMineCount - trGives.size + trGets.size;
+    const theirAfter = trTheirCount - trGets.size + trGives.size;
+    if (myAfter > TRADE_MAX) return err(`This would put your roster at ${myAfter}/${TRADE_MAX}. Send more or receive fewer.`);
+    if (theirAfter > TRADE_MAX) return err(`This would put ${teamName($("#trade-partner").value)} at ${theirAfter}/${TRADE_MAX}.`);
     try {
       await proposeTrade($("#trade-partner").value, [...trGives], [...trGets]);
       $("#trade-modal").hidden = true;
