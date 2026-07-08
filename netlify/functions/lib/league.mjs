@@ -34,7 +34,12 @@ export function isActiveSlot(slot) {
   return slot && slot !== "BN" && slot !== "IL" && !/^BN\d/.test(slot) && !/^IL\d/.test(slot);
 }
 
-// Worse record first: lower win% → fewer points-for → coin flip.
+// Worse record first: lower win% → fewer points-for → stable id/name tiebreak.
+// The final tiebreak must be DETERMINISTIC: a live coin flip made this a
+// non-transitive comparator (undefined behavior for Array.sort) and resolved
+// FAAB ties differently on every re-run/retry. A true tie here needs identical
+// win% AND identical points-for, so this alphabetical fallback is effectively
+// never hit — it exists to keep the sort a consistent total order.
 export function worseRecordFirst(a, b) {
   const pct = (r) => {
     const g = (r.w || 0) + (r.l || 0) + (r.t || 0);
@@ -42,5 +47,5 @@ export function worseRecordFirst(a, b) {
   };
   return pct(a.record || {}) - pct(b.record || {}) ||
     ((a.record || {}).pf || 0) - ((b.record || {}).pf || 0) ||
-    (Math.random() < 0.5 ? -1 : 1);
+    String(a.id || a.name || "").localeCompare(String(b.id || b.name || ""));
 }

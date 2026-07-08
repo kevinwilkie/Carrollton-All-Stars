@@ -46,8 +46,15 @@ export async function finalizeWeekIfEnded(yesterday) {
     if (mu.final || !mu.home || !mu.away) return;
     const tie = mu.homePts === mu.awayPts;
     const homeWon = mu.homePts > mu.awayPts;
-    winners[mu.label || `m${mu.index}`] = tie ? null
-      : homeWon ? mu.home : mu.away;
+    // A playoff game can't end tied — a null winner drops a bracket slot and
+    // stalls advancement with no re-open path. Break it by seed (higher seed =
+    // lower seed number advances); regular-season ties stay real ties.
+    let advance = tie ? null : homeWon ? mu.home : mu.away;
+    if (tie && week.type === "playoff") {
+      const hs = teams[mu.home]?.seed ?? 99, as = teams[mu.away]?.seed ?? 99;
+      advance = hs <= as ? mu.home : mu.away;
+    }
+    winners[mu.label || `m${mu.index}`] = advance;
     const losers = tie ? null : homeWon ? mu.away : mu.home;
 
     if (week.type !== "playoff") {

@@ -22,7 +22,7 @@ export async function processClaims(today) {
 
   const teamsSnap = await L.collection("teams").get();
   const teams = {};
-  teamsSnap.forEach((d) => { teams[d.id] = d.data(); });
+  teamsSnap.forEach((d) => { teams[d.id] = { id: d.id, ...d.data() }; });
   const rosters = {};
   for (const t of CFG.LEAGUE_TEAMS) {
     rosters[t.id] = (await L.collection("rosters").doc(t.id).get()).data() || { players: {} };

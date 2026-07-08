@@ -34,7 +34,7 @@ box scores come from the free MLB Stats API (statsapi.mlb.com).
 - **Two-way players** (Ohtani) split Yahoo-style into separate Batter and Pitcher entries — different teams can own each half (list in `shared/league-config.js` `TWO_WAY_PLAYERS`)
 
 Change a rule → edit `shared/league-config.js`. Owner emails live there too (the single
-source); after changing them, run **Admin → Seed teams** to refresh the allowlist the
+source); after changing them, run **Admin → Sync owner emails** to refresh the allowlist the
 security rules read — no need to touch `firestore.rules`.
 
 ## Development
@@ -57,7 +57,7 @@ Without `FIREBASE_CONFIG` set (see SETUP.md), the draft board runs local-only
 ## Known trade-offs
 
 - **MLB Stats API is unofficial.** It's been stable for years, but fields can shift;
-  `netlify/functions/lib/mlb.js` is the single adapter, and raw stat payloads are kept
+  `netlify/functions/lib/mlb.mjs` is the single adapter, and raw stat payloads are kept
   in Firestore so points can be recomputed after any fix.
 - **ESPN average-salary fetch** (Year-2 keeper prices) is a fragile public endpoint;
   the keeper modal always allows manual entry.

@@ -12,6 +12,7 @@ import Feasibility from "../draft/feasibility.js";
 import ScheduleGen from "../shared/schedule-gen.js";
 import { isCalledOff } from "../netlify/functions/lib/ingest.mjs";
 import { extractStatLines } from "../netlify/functions/lib/mlb.mjs";
+import { worseRecordFirst } from "../netlify/functions/lib/league.mjs";
 
 // ---------------------------------------------------------------- scoring engine
 test("scoring: hitting line (single + double + HR + walk + K)", () => {
@@ -58,6 +59,22 @@ test("ingest: a 0-out pitcher parses to outs:0, never undefined (Firestore-safe)
   assert.ok(lines[1] && lines[1].pitching, "pitching line present for a 0-out appearance");
   assert.equal(lines[1].pitching.outs, 0);
   for (const [k, v] of Object.entries(lines[1].pitching)) assert.notEqual(v, undefined, `pitching.${k} is undefined`);
+});
+
+// ------------------------------------------------------------ waiver ordering
+test("waivers: worseRecordFirst orders worse record first, deterministically", () => {
+  const worse = { id: "a", record: { w: 2, l: 8, t: 0, pf: 100 } };
+  const better = { id: "b", record: { w: 8, l: 2, t: 0, pf: 300 } };
+  assert.ok(worseRecordFirst(worse, better) < 0, "worse record wins the tie (sorts first)");
+  assert.ok(worseRecordFirst(better, worse) > 0, "antisymmetric");
+  // Fully tied teams must resolve the SAME way every call (no Math.random) so a
+  // re-run of the waiver job can't reshuffle results — and it stays a total order.
+  const t1 = { id: "x", record: { w: 5, l: 5, t: 0, pf: 200 } };
+  const t2 = { id: "y", record: { w: 5, l: 5, t: 0, pf: 200 } };
+  const r = worseRecordFirst(t1, t2);
+  assert.notEqual(r, 0, "a stable tiebreak is applied to a true tie");
+  assert.equal(worseRecordFirst(t1, t2), r, "same result on every call");
+  assert.equal(Math.sign(worseRecordFirst(t2, t1)), -Math.sign(r), "antisymmetric on the tiebreak");
 });
 
 // --------------------------------------------------------------- feasibility

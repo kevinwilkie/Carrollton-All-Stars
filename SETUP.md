@@ -34,9 +34,10 @@ order; nothing here requires a terminal except step 6's one command.
    This is the **single source** — you do *not* edit `firestore.rules` for owners.
 2. Commit + push (Netlify redeploys automatically once step 5 is done).
 3. Later, after the site is live and you've signed in as commissioner, run
-   **Admin → Seed teams** (setup step 7). That writes each owner's email onto their team
-   *and* the `config/members` allowlist the security rules read. **Re-run Seed teams
-   whenever you add or change a real owner email** — that's what activates their access.
+   **Admin → Sync owner emails** (setup step 7). That writes each owner's email onto their
+   team *and* the `config/members` allowlist the security rules read. **Re-run Sync owner
+   emails whenever you add or change a real owner email** — that's what activates their
+   access, and it's safe mid-season (it touches only the allowlist, not FAAB or team names).
    (Owners still on a `TODO-` placeholder are skipped until you fill in a real address.)
 
 ## 4. Publish the database rules
@@ -76,19 +77,27 @@ The nightly stats/waivers/trades jobs run on Netlify and need admin access to Fi
      silent failure reaches you. Leave it unset to skip alerts.
 4. **Deploys → Trigger deploy** so the functions pick up the variables.
 5. Check it worked: **Logs → Functions → daily-rollover** should show a successful run
-   the next morning (or trigger one from the season app's **Admin** tab → *Run jobs*).
+   the next morning (or trigger one now from **Netlify → Functions → daily-rollover →
+   Run** to populate players/schedule immediately instead of waiting for the overnight run).
 
 ## 7. First sign-in
 
 1. Open your Netlify URL → click **Sign in** → use `kevin.wilkie@campusoutreach.org`.
    You should land on the season app with the commissioner badge.
 2. Open **Admin** tab:
-   - *Seed teams* — creates the 12 team docs in Firestore from league-config **and** the
-     `config/members` allowlist the rules read. Re-run this whenever you fill in a new
-     owner email (step 3) to grant that owner access. The toast tells you how many member
+   - *Full seed* — first-time setup: creates the 12 team docs in Firestore from
+     league-config. (It also resets FAAB to the budget and rewrites team names, so use it
+     before the season, not mid-test.)
+   - *Sync owner emails* — writes each team's allowed emails **and** the `config/members`
+     allowlist the rules read. Run this whenever you fill in a new owner email (step 3) to
+     grant that owner access; safe to re-run any time. The toast tells you how many member
      emails were written and how many teams are still on a placeholder.
-   - *Generate schedule* — builds the 21-week schedule + playoff weeks (review, save).
-   - *Sync players* — first pull of the MLB player universe.
+   - *MLB data year* — the season the nightly jobs pull from. Leave at the default for the
+     real season; set it to the current MLB year (e.g. 2026) to run a live test.
+   - *Build from MLB calendar* → *Save week map* — the weekly calendar for that year.
+   - *Generate schedule* — builds the 21-week schedule + playoff weeks.
+   - Player universe: the first nightly *daily-rollover* pulls every MLB player, position,
+     and IL status automatically — or trigger daily-rollover once from Netlify to populate now.
 3. Open `/draft/` and sign in there once too — you'll get the green **Commissioner**
    badge; everyone else who opens the link just watches.
 
@@ -101,10 +110,10 @@ The nightly stats/waivers/trades jobs run on Netlify and need admin access to Fi
 1. **Player pool** — `node scripts/build_player_pool.mjs` (no flag needed: it defaults to
    last completed season, e.g. 2026 for a 2027 draft). Commit the refreshed
    `draft/data/players.js`, or ask Claude to.
-2. **Seed + schedule** — in the season app **Admin** tab: *Seed teams* (writes teams +
-   the owner allowlist), *Build week map* → *Save*, then *Generate schedule*.
+2. **Seed + schedule** — in the season app **Admin** tab: *Full seed* (creates the team
+   docs), *Build from MLB calendar* → *Save week map*, then *Generate schedule*.
 3. **Owner emails** — make sure every real owner email is in `shared/league-config.js`
-   and you've re-run *Seed teams* (step 3 of setup), so they can all sign in.
+   and you've run *Sync owner emails* (step 3 of setup), so they can all sign in.
 
 **Draft night:**
 
@@ -133,7 +142,7 @@ file you can keep.
 - **"Sign-in failed / unauthorized domain"** → step 4.3 (Authorized domains).
 - **Owner sees "not part of the league" / their screens are empty** → their Google email
   isn't in the allowlist yet. Put the real address in `shared/league-config.js`, push, then
-  run **Admin → Seed teams** to refresh `config/members`. (Editing the file alone isn't
+  run **Admin → Sync owner emails** to refresh `config/members`. (Editing the file alone isn't
   enough — the seed is what writes the allowlist the rules read.)
 - **No stats appearing** → Netlify function logs (step 6.5); most often the env vars
   are missing or the service-account JSON was truncated in copy/paste.
