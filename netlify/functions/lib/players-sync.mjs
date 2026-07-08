@@ -4,6 +4,7 @@
  *   2. yesterday's statlines → appearance counters (position games, GS, relief)
  *   3. recompute positions[] + eligibleSlots per the league eligibility rules
  */
+import Scoring from "../../../shared/scoring.js";
 import { db, leagueRef } from "./firebase.mjs";
 import { CFG } from "./league.mjs";
 import * as MLB from "./mlb.mjs";
@@ -44,6 +45,9 @@ export async function syncPlayers(yesterday, season) {
       gsThisSeason: (p || {}).gsThisSeason || 0,
       reliefThisSeason: (p || {}).reliefThisSeason || 0,
       pitchedThisSeason: (p || {}).pitchedThisSeason || 0,
+      // running season points, kept per half (batting on :B, pitching on :P)
+      seasonPointsB: (b || {}).seasonPoints || 0,
+      seasonPointsP: (p || {}).seasonPoints || 0,
     };
     delete existing[pid].rosteredBy; // ownership lives on the split docs
   });
@@ -87,6 +91,14 @@ export async function syncPlayers(yesterday, season) {
       if (line.pitching.gamesStarted) u.gsThisSeason = (u.gsThisSeason || 0) + 1;
       else u.reliefThisSeason = (u.reliefThisSeason || 0) + 1;
     }
+    // Running season fantasy points (raw, before any team-level start cap). Two-
+    // way people keep the halves apart; everyone else uses the whole line.
+    if (TWO_WAY.has(id)) {
+      if (line.batting) u.seasonPointsB = Scoring.round1((u.seasonPointsB || 0) + Scoring.scoreHitting(line.batting));
+      if (line.pitching) u.seasonPointsP = Scoring.round1((u.seasonPointsP || 0) + Scoring.scorePitching(line.pitching));
+    } else {
+      u.seasonPoints = Scoring.round1((u.seasonPoints || 0) + (line.points || 0));
+    }
     u.lastCountedDate = yesterday;
   });
 
@@ -102,8 +114,11 @@ export async function syncPlayers(yesterday, season) {
         ...prev, ...u,
         name: `${baseName} (${label})`,
         personId: +pid, twoWayRole: role,
-        rosteredBy: prev.rosteredBy ?? null, // each half has its own owner
+        rosteredBy: prev.rosteredBy ?? null,          // each half has its own owner
+        seasonPoints: role === "B" ? (u.seasonPointsB || 0) : (u.seasonPointsP || 0),
       };
+      delete updates[key].seasonPointsB;
+      delete updates[key].seasonPointsP;
     });
   });
 

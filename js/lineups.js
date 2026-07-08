@@ -492,10 +492,10 @@ function openPlayerCard(id) {
   const appr = live.apprThisSeason || {};
   const games = Object.values(appr).reduce((a, b) => a + b, 0) + (live.pitchedThisSeason || 0);
   const tiles = [
-    [wp != null ? wp : "—", "WEEK PTS"],
+    [live.seasonPoints != null ? live.seasonPoints : "—", "SEASON"],
+    [wp != null ? wp : "—", "WEEK"],
     [dp != null ? dp : "—", "TODAY"],
     [games || "—", "GAMES"],
-    [(p.positions || []).length || "—", "SLOTS"],
   ];
 
   // Eligibility breakdown

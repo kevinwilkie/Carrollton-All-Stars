@@ -25,15 +25,23 @@ function renderPlayers() {
   if (plFilter.pos !== "ALL") list = list.filter((p) => (p.positions || []).includes(plFilter.pos));
   const q = plFilter.q.trim().toLowerCase();
   if (q) list = list.filter((p) => (p.name || "").toLowerCase().includes(q));
-  list = list.slice().sort((a, b) => (a.name || "").localeCompare(b.name || "")).slice(0, 200);
+  // Best fantasy producers first — the useful order for waiver decisions.
+  list = list.slice().sort((a, b) =>
+    (b.seasonPoints || 0) - (a.seasonPoints || 0) || (a.name || "").localeCompare(b.name || ""));
+  const total = list.length;
+  const CAP = 300;
+  list = list.slice(0, CAP);
 
   const faab = (App.teams[App.myTeamId] || {}).faabRemaining;
   const rows = list.map((p) => {
     const owned = p.rosteredBy;
-    return `<div class="row">${avatarHTML(p, 30)}` +
-      `<span class="grow"><span class="pl-name">${escapeHtml(p.name)}</span>` +
+    const sp = p.seasonPoints;
+    return `<div class="row">` +
+      `<span class="grow pl-tap" data-card="${p.mlbId}" style="display:flex;align-items:center;gap:10px;cursor:pointer;min-width:0">` +
+      `${avatarHTML(p, 30)}<span style="min-width:0"><span class="pl-name">${escapeHtml(p.name)}</span>` +
       `<span class="sub pl-badges">${posBadges(p.positions, "sm")} ${escapeHtml(p.mlbTeam || "")}` +
-      `${p.ilStatus ? ` <span class="pl-il">${escapeHtml(p.ilStatus)}</span>` : ""}</span></span>` +
+      `${p.ilStatus ? ` <span class="pl-il">${escapeHtml(p.ilStatus)}</span>` : ""}</span></span></span>` +
+      `<span class="val" title="Season fantasy points">${sp != null ? sp : "—"}</span>` +
       (owned
         ? `<span class="pl-owner">${escapeHtml(teamName(owned))}</span>`
         : App.myTeamId
@@ -41,6 +49,8 @@ function renderPlayers() {
           : "") +
       `</div>`;
   }).join("") || `<div class="empty-note">No players match.</div>`;
+  const moreNote = total > CAP
+    ? `<div class="empty-note">Showing the top ${CAP} of ${total} by season points — search to narrow.</div>` : "";
 
   const myClaims = App.claims.filter((c) => c.status === "pending");
   const claimRows = myClaims.map((c) =>
@@ -65,7 +75,7 @@ function renderPlayers() {
     ["available", "all", "rostered"].map((a) =>
       `<button class="segbtn${plFilter.avail === a ? " on" : ""}" data-avail="${a}">${a[0].toUpperCase() + a.slice(1)}</button>`).join("") +
     `</span></div>` +
-    `<div class="card player-list">${rows}</div>` +
+    `<div class="card player-list">${rows}</div>${moreNote}` +
     (myClaims.length || resolved.length
       ? `<div class="card claims-pending"><h3>My waiver claims</h3>${claimRows}${resolvedRows}</div>` : "");
 
@@ -75,6 +85,8 @@ function renderPlayers() {
     b.addEventListener("click", () => { plFilter.pos = b.dataset.pos; renderPlayers(); }));
   host.querySelectorAll("[data-avail]").forEach((b) =>
     b.addEventListener("click", () => { plFilter.avail = b.dataset.avail; renderPlayers(); }));
+  host.querySelectorAll("[data-card]").forEach((b) =>
+    b.addEventListener("click", () => openPlayerCard(b.dataset.card)));
   host.querySelectorAll("[data-claim]").forEach((b) =>
     b.addEventListener("click", () => openClaim(b.dataset.claim)));
   host.querySelectorAll("[data-cancel]").forEach((b) =>
