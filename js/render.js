@@ -32,6 +32,22 @@ function renderActive() {
   if (fn) { try { fn(); } catch (e) { console.error("render error", e); } }
 }
 
+// ---- load-error surfacing ----------------------------------------------------
+// A failed fetch/listener records a message here; the affected view shows a
+// Retry card (errorCard) instead of a perpetual "Loading…". Clearing the flag
+// and re-rendering re-runs the loader (its cache is still empty after failure).
+function dataError(key, e) {
+  App.errors[key] = (e && e.message) || "Couldn't load data.";
+  console.error(`load error [${key}]`, e);
+  toast("Couldn't load — check your connection and retry.", "error");
+  renderActive();
+}
+function errorCard(key) {
+  return `<div class="card"><h3>Couldn't load</h3>` +
+    `<p class="hint">${escapeHtml(App.errors[key] || "Something went wrong.")}</p>` +
+    `<button class="btn" data-retry="${key}">Retry</button></div>`;
+}
+
 // Topbar pills: current week + my FAAB; role badge.
 function renderShell() {
   const wk = currentWeek();
@@ -89,6 +105,13 @@ function applyRole() {
 document.addEventListener("DOMContentLoaded", () => {
   wireThemeButton($("#btn-theme"));
   trackHeaderHeight();
+  // Retry a failed view load: clear its error and re-render (the loader re-runs).
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-retry]");
+    if (!b) return;
+    delete App.errors[b.dataset.retry];
+    renderActive();
+  });
   $$(".tab").forEach((b) => b.addEventListener("click", () => setTab(b.dataset.tab)));
   $("#btn-auth").addEventListener("click", () => {
     if (Auth.user) signOutUser(); else signInGoogle();

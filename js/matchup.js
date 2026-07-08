@@ -14,6 +14,9 @@ async function ensureMatchupData(home, away, week) {
     await loadPlayers();
     muScores[home] = await loadScore(home, week, true);
     muScores[away] = await loadScore(away, week, true);
+  } catch (e) {
+    muLoading = false;
+    return dataError("matchup", e);
   } finally { muLoading = false; }
   renderActive();
 }
@@ -33,6 +36,7 @@ function weekPlayerTotals(score) {
 function renderMatchup() {
   const host = $("#view-matchup");
   if (!App.fs) return host.innerHTML = setupNotice();
+  if (App.errors.matchup) return host.innerHTML = errorCard("matchup");
   const wk = currentWeek();
   if (!wk) return host.innerHTML = `<div class="empty-note">No scoring week is active.</div>`;
   const mu = App.matchups.find((m) => m.home === App.myTeamId || m.away === App.myTeamId);

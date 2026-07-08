@@ -10,8 +10,9 @@ let plClaimTarget = null;
 function renderPlayers() {
   const host = $("#view-players");
   if (!App.fs) return host.innerHTML = setupNotice();
+  if (App.errors.players) return host.innerHTML = errorCard("players");
   if (!App.players) {
-    loadPlayers().then(renderActive);
+    loadPlayers().then(renderActive).catch((e) => dataError("players", e));
     return host.innerHTML = `<div class="empty-note">Loading players…</div>`;
   }
 

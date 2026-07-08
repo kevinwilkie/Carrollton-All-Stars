@@ -17,6 +17,12 @@ function apiInit() {
 function clearUnsubs(list) { list.splice(0).forEach((u) => { try { u(); } catch (e) {} }); }
 
 // ---- core listeners (after sign-in resolves) ---------------------------------
+// A live-listener error (usually a permissions/rules problem) shouldn't fail
+// silently — surface it once so the user knows data may be stale.
+function listenerError(what) {
+  return (e) => { console.error(`listener [${what}]`, e); toast(`Live ${what} updates interrupted — reload if data looks stale.`, "error"); };
+}
+
 function subscribeCore() {
   clearUnsubs(App.unsubs);
   App.unsubs.push(
@@ -25,20 +31,20 @@ function subscribeCore() {
       subscribeWeek();
       renderShell();
       renderActive();
-    }),
+    }, listenerError("settings")),
     L().collection("teams").onSnapshot((snap) => {
       snap.forEach((d) => { App.teams[d.id] = d.data(); });
       renderShell();
       renderActive();
-    }),
+    }, listenerError("standings")),
     L().collection("trades").onSnapshot((snap) => {
       App.trades = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
       renderActive();
-    }),
+    }, listenerError("trade")),
     L().collection("transactions").orderBy("at", "desc").limit(120).onSnapshot((snap) => {
       App.transactions = snap.docs.map((d) => d.data());
       renderActive();
-    }, () => {}),
+    }, listenerError("transaction")),
   );
   if (App.myTeamId) {
     App.unsubs.push(
@@ -46,7 +52,7 @@ function subscribeCore() {
         App.claims = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
           .sort((a, b) => (b.placedAt || "").localeCompare(a.placedAt || ""));
         renderActive();
-      }),
+      }, listenerError("waiver")),
     );
   }
   subscribeDay();
@@ -60,7 +66,7 @@ function subscribeWeek() {
   weekUnsub = L().collection("matchups").where("week", "==", wk.n).onSnapshot((snap) => {
     App.matchups = snap.docs.map((d) => d.data()).sort((a, b) => (a.index || 0) - (b.index || 0));
     renderActive();
-  });
+  }, listenerError("matchup"));
 }
 
 // ---- per-date listeners (My Team) ---------------------------------------------
@@ -73,14 +79,14 @@ function subscribeDay() {
       L().collection("lineups").doc(`${App.myTeamId}_${App.date}`).onSnapshot((d) => {
         App.lineup = d.exists ? d.data() : null;
         renderActive();
-      }),
+      }, listenerError("lineup")),
     );
   }
   App.dayUnsubs.push(
     L().collection("mlbdays").doc(App.date).onSnapshot((d) => {
       App.mlbDay = d.exists ? d.data() : null;
       renderActive();
-    }),
+    }, listenerError("schedule")),
   );
 }
 

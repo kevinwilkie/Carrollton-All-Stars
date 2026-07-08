@@ -13,10 +13,12 @@ function renderSchedule() {
   if (!weeks.length)
     return host.innerHTML = `<div class="card"><h3>Schedule</h3><p class="hint">No week map yet — the commissioner sets it up on the Admin tab.</p></div>`;
 
+  if (App.errors.schedule) return host.innerHTML = errorCard("schedule");
   if (!schCache) {
     schCache = {};
     Promise.all(weeks.map((w) => loadWeekSchedule(w.n).then((d) => { schCache[w.n] = d; })))
-      .then(renderActive);
+      .then(renderActive)
+      .catch((e) => { schCache = null; dataError("schedule", e); });
     return host.innerHTML = `<div class="empty-note">Loading schedule…</div>`;
   }
 

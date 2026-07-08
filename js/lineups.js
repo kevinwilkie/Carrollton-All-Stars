@@ -39,6 +39,9 @@ async function ensureMyTeamData() {
     luRoster = await loadRoster(App.myTeamId, true);
     const wk = weekFor(App.date);
     luScore = wk ? await loadScore(App.myTeamId, wk.n, true) : null;
+  } catch (e) {
+    luLoading = false;
+    return dataError("myteam", e);
   } finally {
     luLoading = false;
   }
@@ -229,6 +232,7 @@ function renderMyTeam() {
   if (!App.myTeamId) return host.innerHTML =
     `<div class="card"><h3>My Team</h3><p class="hint">This Google account isn't linked to a team. ` +
     `Ask the commissioner to add your email to the league config.</p></div>`;
+  if (App.errors.myteam) return host.innerHTML = errorCard("myteam");
   if (!App.players || !luRoster) { ensureMyTeamData(); return host.innerHTML = `<div class="empty-note">Loading roster…</div>`; }
 
   const { active, il } = currentAssignment();

@@ -17,6 +17,9 @@ async function ensureKeeperData() {
   try {
     kpRoster = await loadRoster(App.myTeamId, true);
     kpDecl = await loadKeeperDeclaration(LEAGUE.season + 1);
+  } catch (e) {
+    kpLoading = false;
+    return dataError("keepers", e);
   } finally { kpLoading = false; }
   renderActive();
 }
@@ -41,6 +44,7 @@ function renderKeepers() {
   const host = $("#view-keepers");
   if (!App.fs) return host.innerHTML = setupNotice();
   if (!App.myTeamId) return host.innerHTML = `<div class="empty-note">Sign in with a team account to manage keepers.</div>`;
+  if (App.errors.keepers) return host.innerHTML = errorCard("keepers");
   if (!kpRoster) { ensureKeeperData(); return host.innerHTML = `<div class="empty-note">Loading…</div>`; }
 
   const declared = new Set(((kpDecl && kpDecl.entries) || []).map((e) => String(e.mlbId)));

@@ -22,6 +22,7 @@ const App = {
   trades: [],               // all trades (live)
   transactions: [],         // recent transaction log (live)
   date: etDate(),           // the day being viewed/edited on My Team
+  errors: {},               // per-view load errors (key -> message) for retry cards
   unsubs: [],               // core listeners
   dayUnsubs: [],            // per-date listeners (lineup, mlbday)
 };
