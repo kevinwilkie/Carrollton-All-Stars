@@ -178,8 +178,11 @@ async function withdrawTrade(id) {
 }
 
 async function vetoTrade(id, on) {
+  // `lastVetoBy` names the writer's team so the rule can verify they own it,
+  // aren't involved, and touched only their own veto entry.
   await L().collection("trades").doc(id).update({
     ["vetoes." + App.myTeamId]: on ? true : firebase.firestore.FieldValue.delete(),
+    lastVetoBy: App.myTeamId,
   });
 }
 

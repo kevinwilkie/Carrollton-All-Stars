@@ -21,7 +21,8 @@ function renderAdmin() {
 
     `<div class="card"><h3>1 · Seed league</h3>` +
     `<p class="hint">Creates/updates the 12 team documents from <code>shared/league-config.js</code> ` +
-    `(names, owner emails, $${FAAB.budget} FAAB). Safe to re-run — records are preserved.</p>` +
+    `(names, owner emails, $${FAAB.budget} FAAB) and the members allowlist the security rules read. ` +
+    `Re-run this whenever you add a real owner email. Safe to re-run — records are preserved.</p>` +
     `<button class="btn" id="ad-seed">Seed teams</button></div>` +
 
     `<div class="card"><h3>2 · Week map</h3>` +
@@ -72,7 +73,8 @@ async function adminSeed() {
     const batch = App.fs.batch();
     LEAGUE_TEAMS.forEach((t) => {
       batch.set(L().collection("teams").doc(t.id), {
-        name: t.name, owner: t.owner, ownerEmails: t.emails,
+        name: t.name, owner: t.owner,
+        ownerEmails: (t.emails || []).filter(isRealEmail),   // drop TODO placeholders
         faabRemaining: FAAB.budget,
       }, { merge: true });
     });
@@ -81,8 +83,15 @@ async function adminSeed() {
       tradeReviewHours: TRADE.reviewHours, vetoesNeeded: TRADE.vetoesNeeded,
       faabBudget: FAAB.budget, keeperMax: KEEPER.max,
     }, { merge: true });
+    // The allowlist firestore.rules reads — real owner + commish emails only.
+    const members = memberEmails();
+    batch.set(L().collection("config").doc("members"), {
+      emails: members, updatedAt: new Date().toISOString(),
+    });
     await batch.commit();
-    toast("League seeded.", "success");
+    const missing = LEAGUE_TEAMS.filter((t) => !(t.emails || []).some(isRealEmail)).length;
+    toast(`League seeded · ${members.length} member email${members.length === 1 ? "" : "s"}` +
+      (missing ? ` · ${missing} team${missing === 1 ? "" : "s"} still placeholder` : ""), "success");
   } catch (e) { toast("Seed failed: " + e.message, "error"); }
 }
 

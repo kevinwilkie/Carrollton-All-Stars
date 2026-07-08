@@ -17,7 +17,10 @@ export async function processTrades() {
     const t = d.data();
     if (!t.reviewEndsAt || t.reviewEndsAt > now) continue;
 
-    const vetoes = Object.values(t.vetoes || {}).filter(Boolean).length;
+    // Count only uninvolved owners' vetoes (the rules already bar the two
+    // participants from writing one, but be defensive against stale data).
+    const vetoes = Object.entries(t.vetoes || {})
+      .filter(([team, v]) => v && team !== t.from && team !== t.to).length;
     if (vetoes >= CFG.TRADE.vetoesNeeded) {
       await d.ref.set({ status: "vetoed", resolvedAt: now, vetoCount: vetoes }, { merge: true });
       vetoed++;

@@ -31,8 +31,13 @@ order; nothing here requires a terminal except step 6's one command.
 
 1. **`shared/league-config.js`** → replace each `TODO-…@example.com` with the Google
    email that owner will sign in with (ask each owner which Gmail/Google account they use).
-2. **`firestore.rules`** → replace the same 11 `TODO-…` emails in the `isOwner()` list.
-3. Commit + push (Netlify redeploys automatically once step 5 is done).
+   This is the **single source** — you do *not* edit `firestore.rules` for owners.
+2. Commit + push (Netlify redeploys automatically once step 5 is done).
+3. Later, after the site is live and you've signed in as commissioner, run
+   **Admin → Seed teams** (setup step 7). That writes each owner's email onto their team
+   *and* the `config/members` allowlist the security rules read. **Re-run Seed teams
+   whenever you add or change a real owner email** — that's what activates their access.
+   (Owners still on a `TODO-` placeholder are skipped until you fill in a real address.)
 
 ## 4. Publish the database rules
 
@@ -75,7 +80,10 @@ The nightly stats/waivers/trades jobs run on Netlify and need admin access to Fi
 1. Open your Netlify URL → click **Sign in** → use `kevin.wilkie@campusoutreach.org`.
    You should land on the season app with the commissioner badge.
 2. Open **Admin** tab:
-   - *Seed league* — creates the 12 team docs in Firestore from league-config.
+   - *Seed teams* — creates the 12 team docs in Firestore from league-config **and** the
+     `config/members` allowlist the rules read. Re-run this whenever you fill in a new
+     owner email (step 3) to grant that owner access. The toast tells you how many member
+     emails were written and how many teams are still on a placeholder.
    - *Generate schedule* — builds the 21-week schedule + playoff weeks (review, save).
    - *Sync players* — first pull of the MLB player universe.
 3. Open `/draft/` and sign in there once too — you'll get the green **Commissioner**
@@ -105,8 +113,10 @@ The nightly stats/waivers/trades jobs run on Netlify and need admin access to Fi
 ## Troubleshooting
 
 - **"Sign-in failed / unauthorized domain"** → step 4.3 (Authorized domains).
-- **Owner sees "not part of the league"** → their Google email doesn't match
-  league-config/firestore.rules — fix both, push, redeploy.
+- **Owner sees "not part of the league" / their screens are empty** → their Google email
+  isn't in the allowlist yet. Put the real address in `shared/league-config.js`, push, then
+  run **Admin → Seed teams** to refresh `config/members`. (Editing the file alone isn't
+  enough — the seed is what writes the allowlist the rules read.)
 - **No stats appearing** → Netlify function logs (step 6.5); most often the env vars
   are missing or the service-account JSON was truncated in copy/paste.
 - **Draft board says "local only"** → `FIREBASE_CONFIG` still null in

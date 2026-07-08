@@ -1,10 +1,23 @@
 rules_version = '2';
 
 // Carrollton All-Stars — Firestore security rules.
-// Owners read everything and write only their own lineup / claims / trades /
-// votes. All money-moving and scoring writes happen in the Netlify functions
-// (Admin SDK bypasses these rules). Keep the email lists in sync with
-// shared/league-config.js.
+//
+// Read model:
+//   • League-wide docs (teams, rosters, players, scores, schedule, matchups,
+//     mlbdays, statlines, transactions, config, trades) — any league member.
+//   • Private docs (claims, keepers, lineups) — only the owning team + commish.
+//     This keeps FAAB bids SEALED until the ~3am run and hides keeper plans and
+//     pre-lock lineups from opponents.
+//
+// Membership is data-driven: the owner allowlist lives in ONE place,
+// leagues/carrollton/config/members (field `emails`), written by the Admin →
+// "Seed teams" action from shared/league-config.js. Editing owner emails no
+// longer means hand-syncing this file — fill them in league-config.js and
+// re-seed. The commissioner list stays hard-coded here so the commish can
+// always sign in and run that first seed (no bootstrap lock-out).
+//
+// All money-moving and scoring writes happen in the Netlify functions; the
+// Admin SDK bypasses these rules entirely.
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -16,95 +29,97 @@ service cloud.firestore {
         'kevinwilkie92@gmail.com'
       ];
     }
-    // TODO(kevin): replace placeholders with the real owner emails
-    // (same lists as shared/league-config.js LEAGUE_TEAMS).
-    function isOwner() {
-      return signedIn() && email() in [
-        'kevin.wilkie@campusoutreach.org',
-        'kevinwilkie92@gmail.com',
-        'TODO-katie@example.com',
-        'TODO-kyle@example.com',
-        'TODO-michael@example.com',
-        'TODO-ed@example.com',
-        'TODO-anthony@example.com',
-        'TODO-curtis@example.com',
-        'TODO-joel@example.com',
-        'TODO-sam@example.com',
-        'TODO-joe@example.com',
-        'TODO-dan@example.com',
-        'TODO-richie@example.com'
-      ];
+    // Owner allowlist, read from the seeded members doc (privileged get, not
+    // subject to the read rules below, so no recursion). Absent doc → members
+    // is empty and only the commish resolves as an owner until the first seed.
+    function memberEmails() {
+      return exists(/databases/$(database)/documents/leagues/carrollton/config/members)
+        ? get(/databases/$(database)/documents/leagues/carrollton/config/members).data.get('emails', [])
+        : [];
     }
+    function isOwner() { return signedIn() && (isCommish() || email() in memberEmails()); }
     function ownsTeam(teamId) {
       return signedIn() &&
-        email() in get(/databases/$(database)/documents/leagues/carrollton/teams/$(teamId)).data.ownerEmails;
+        email() in get(/databases/$(database)/documents/leagues/carrollton/teams/$(teamId)).data.get('ownerEmails', []);
     }
 
     match /leagues/carrollton {
 
-      // Default: league members read, nobody writes (functions bypass rules).
-      match /{document=**} {
-        allow read: if isOwner();
-        allow write: if false;
-      }
+      // Default: deny. Every allow below is additive (access = ANY rule grants).
+      match /{document=**} { allow read, write: if false; }
 
-      // Commissioner can hand-fix anything from the Admin tab.
-      match /{collection}/{doc} {
-        allow write: if isCommish();
-      }
+      // Commissioner can read and hand-fix anything from the Admin tab.
+      match /{collection}/{doc} { allow read, write: if isCommish(); }
 
-      // Daily lineup: only your own, and never touching the `locked` map the
-      // functions maintain. Doc id = {teamId}_{YYYY-MM-DD}.
+      // ---- League-readable, function/commish-written collections ----
+      match /config/{doc}       { allow read: if isOwner(); }
+      match /teams/{doc}        { allow read: if isOwner(); }
+      match /rosters/{doc}      { allow read: if isOwner(); }
+      match /players/{doc}      { allow read: if isOwner(); }
+      match /scores/{doc}       { allow read: if isOwner(); }
+      match /schedule/{doc}     { allow read: if isOwner(); }
+      match /matchups/{doc}     { allow read: if isOwner(); }
+      match /mlbdays/{doc}      { allow read: if isOwner(); }
+      match /statlines/{doc}    { allow read: if isOwner(); }
+      match /transactions/{doc} { allow read: if isOwner(); }
+
+      // ---- Private: your daily lineup (id = {teamId}_{YYYY-MM-DD}) ----
+      // Read/write your own only, never touching the `locked` map the functions
+      // maintain. Opponents can't see your lineup before it locks.
       match /lineups/{lineupId} {
-        allow create: if isCommish() ||
-          (ownsTeam(lineupId.split('_')[0]) &&
-           !('locked' in request.resource.data));
-        allow update: if isCommish() ||
-          (ownsTeam(lineupId.split('_')[0]) &&
-           request.resource.data.get('locked', {}) == resource.data.get('locked', {}));
+        allow read: if ownsTeam(lineupId.split('_')[0]);
+        allow create: if ownsTeam(lineupId.split('_')[0]) &&
+          !('locked' in request.resource.data);
+        allow update: if ownsTeam(lineupId.split('_')[0]) &&
+          request.resource.data.get('locked', {}) == resource.data.get('locked', {});
       }
 
-      // FAAB claims: create your own pending claim (bid ≥ $1), cancel it while
-      // pending. Resolution is function-only.
+      // ---- Private: sealed FAAB claims ----
+      // Only the bidding team may read/create/cancel its own claim; nobody can
+      // see a rival's bid or drop before the overnight run resolves it.
       match /claims/{claimId} {
-        allow create: if isCommish() ||
-          (ownsTeam(request.resource.data.teamId) &&
-           request.resource.data.status == 'pending' &&
-           request.resource.data.bid is int &&
-           request.resource.data.bid >= 1);
-        allow delete: if isCommish() ||
-          (ownsTeam(resource.data.teamId) && resource.data.status == 'pending');
+        allow read: if ownsTeam(resource.data.teamId);
+        allow create: if ownsTeam(request.resource.data.teamId) &&
+          request.resource.data.status == 'pending' &&
+          request.resource.data.bid is int &&
+          request.resource.data.bid >= 1;
+        allow delete: if ownsTeam(resource.data.teamId) &&
+          resource.data.status == 'pending';
       }
 
-      // Keeper declarations: each owner saves their own list for next season.
-      // Doc id = {season}_{teamId}, e.g. 2028_acuna-matata.
+      // ---- Private: keeper declarations (id = {season}_{teamId}) ----
       match /keepers/{keeperId} {
-        allow write: if isCommish() || ownsTeam(keeperId.split('_')[1]);
+        allow read, write: if ownsTeam(keeperId.split('_')[1]);
       }
 
-      // Trades: proposer creates; the receiving team may accept/reject; any
-      // uninvolved owner may flip ONLY their own veto flag; execution is
-      // function-only (status stays whatever the timer decides).
+      // ---- Trades: league-readable; guarded writes ----
+      // Proposer creates; recipient accepts/rejects; proposer withdraws; an
+      // UNINVOLVED owner may toggle ONLY their own veto during review. The
+      // writer names their team in `lastVetoBy`; the rule verifies they own it,
+      // aren't a participant, and changed no other team's veto entry — so no one
+      // can stuff or clear another team's vote, or force their own trade through.
       match /trades/{tradeId} {
-        allow create: if isCommish() ||
-          (ownsTeam(request.resource.data.from) &&
-           request.resource.data.status == 'proposed');
-        allow update: if isCommish() || (
-          isOwner() && (
-            // recipient accepting or rejecting the proposal
-            (ownsTeam(resource.data.to) &&
-             resource.data.status == 'proposed' &&
-             request.resource.data.status in ['accepted', 'rejected'] &&
-             request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'reviewEndsAt', 'respondedAt'])) ||
-            // proposer withdrawing
-            (ownsTeam(resource.data.from) &&
-             resource.data.status == 'proposed' &&
-             request.resource.data.status == 'withdrawn' &&
-             request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])) ||
-            // an uninvolved owner toggling their own veto during review
-            (resource.data.status == 'accepted' &&
-             request.resource.data.diff(resource.data).affectedKeys().hasOnly(['vetoes']))
-          )
+        allow read: if isOwner();
+        allow create: if ownsTeam(request.resource.data.from) &&
+          request.resource.data.status == 'proposed';
+        allow update: if isOwner() && (
+          (ownsTeam(resource.data.to) &&
+           resource.data.status == 'proposed' &&
+           request.resource.data.status in ['accepted', 'rejected'] &&
+           request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['status', 'reviewEndsAt', 'respondedAt'])) ||
+          (ownsTeam(resource.data.from) &&
+           resource.data.status == 'proposed' &&
+           request.resource.data.status == 'withdrawn' &&
+           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])) ||
+          (resource.data.status == 'accepted' &&
+           ownsTeam(request.resource.data.lastVetoBy) &&
+           request.resource.data.lastVetoBy != resource.data.from &&
+           request.resource.data.lastVetoBy != resource.data.to &&
+           request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['vetoes', 'lastVetoBy']) &&
+           request.resource.data.vetoes.diff(resource.data.vetoes).affectedKeys()
+             .hasOnly([request.resource.data.lastVetoBy]))
         );
       }
     }

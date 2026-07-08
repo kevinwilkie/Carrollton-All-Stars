@@ -25,8 +25,10 @@
 
   // ---- The 12 teams ----------------------------------------------------------
   // `emails` = the Google account(s) the owner may sign in with (any of them
-  // maps to the team). TODO(kevin): fill in the 11 missing emails. Keep these
-  // in sync with firestore.rules.
+  // maps to the team). TODO(kevin): replace the 11 TODO-* placeholders with real
+  // addresses, then run Admin → "Seed teams" — that propagates them to Firestore
+  // (team ownerEmails + the config/members allowlist firestore.rules reads).
+  // This file is the single source; the rules file needs no per-owner editing.
   const LEAGUE_TEAMS = [
     { id: "acuna-matata",   name: "Acuña Matata",                  owner: "Kevin Wilkie",    emails: ["kevin.wilkie@campusoutreach.org", "kevinwilkie92@gmail.com"] },
     { id: "rally-cats",     name: "Rally Cats",                    owner: "Katie Pollard",   emails: ["TODO-katie@example.com"] },
@@ -45,6 +47,22 @@
   // Commissioner Google account(s). Must match database.rules.json (RTDB) and
   // firestore.rules — all three gate on the same email(s).
   const COMMISH_EMAILS = ["kevin.wilkie@campusoutreach.org", "kevinwilkie92@gmail.com"];
+
+  // Placeholder owner slots use TODO-…@example.com until Kevin fills the real
+  // address. `isRealEmail` filters those out so a placeholder can never seed a
+  // team's ownerEmails or the members allowlist (which would grant nobody, but
+  // we keep the lists clean). This file is the SINGLE source of owner emails —
+  // Admin → "Seed teams" propagates them to Firestore (firestore.rules reads
+  // the seeded members doc, so the rules file never needs per-owner editing).
+  function isRealEmail(e) {
+    return !!e && e.indexOf("@") > 0 && !/^TODO/i.test(e) && !/@example\.com$/i.test(e);
+  }
+  function memberEmails() {
+    const set = {};
+    COMMISH_EMAILS.forEach((e) => { if (isRealEmail(e)) set[e] = 1; });
+    LEAGUE_TEAMS.forEach((t) => (t.emails || []).forEach((e) => { if (isRealEmail(e)) set[e] = 1; }));
+    return Object.keys(set);
+  }
 
   // ---- Draft -----------------------------------------------------------------
   const BUDGET = 300;        // auction dollars per team
@@ -149,7 +167,7 @@
   };
 
   return {
-    LEAGUE, LEAGUE_TEAMS, COMMISH_EMAILS,
+    LEAGUE, LEAGUE_TEAMS, COMMISH_EMAILS, isRealEmail, memberEmails,
     BUDGET, ROSTER_SIZE, LINEUP_SLOTS, BENCH_SLOTS, IL_SLOTS,
     HITTER_POSITIONS, SLOT_ELIGIBILITY, ELIGIBILITY,
     SCORING, SEASON_STRUCTURE, FAAB, TRADE, KEEPER, TWO_WAY_PLAYERS, PITCHING,

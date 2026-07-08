@@ -25,7 +25,8 @@ function renderTrades() {
   }).join(", ") || "—";
 
   const card = (t) => {
-    const vetoes = Object.values(t.vetoes || {}).filter(Boolean).length;
+    const vetoes = Object.entries(t.vetoes || {})
+      .filter(([team, v]) => v && team !== t.from && team !== t.to).length;
     const involved = t.from === App.myTeamId || t.to === App.myTeamId;
     const myVeto = !!(t.vetoes || {})[App.myTeamId];
     let actions = "";
