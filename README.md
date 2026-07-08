@@ -44,7 +44,12 @@ python3 scripts/serve.py          # http://localhost:8000 (season app) and /draf
 node scripts/build_player_pool.mjs    # refresh draft/data/players.js from MLB
 node scripts/generate_schedule.mjs    # print/emit the 21-week schedule
 node scripts/replay_season.mjs --date 2026-06-15   # score a real MLB day (backtest)
+
+npm test                          # unit tests (scoring, feasibility, schedule, rules logic)
+python3 scripts/serve.py & npm run test:browser   # Playwright smoke tests
 ```
+
+Both suites run in CI on every push (`.github/workflows/ci.yml`).
 
 Without `FIREBASE_CONFIG` set (see SETUP.md), the draft board runs local-only
 (saves to your browser) and the season app shows demo data — enough to develop against.
