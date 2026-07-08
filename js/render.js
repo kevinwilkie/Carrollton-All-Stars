@@ -102,6 +102,11 @@ document.addEventListener("DOMContentLoaded", () => {
     delete App.errors[b.dataset.retry];
     renderActive();
   });
+  // Any team name tagged [data-team-view] opens that team's roster (scouting).
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-team-view]");
+    if (b && typeof openTeamRoster === "function") openTeamRoster(b.dataset.teamView);
+  });
   $$(".tab").forEach((b) => b.addEventListener("click", () => setTab(b.dataset.tab)));
   // Slide-out menu: ☰ opens it, its items switch tab (setTab closes the menu),
   // and the ✕ / backdrop / Escape close it.

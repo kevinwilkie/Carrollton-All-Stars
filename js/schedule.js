@@ -42,6 +42,33 @@ function renderSchedule() {
 
   host.innerHTML = `<div class="view-head"><h2>Schedule</h2>` +
     `<button class="btn btn-ghost btn-small" id="sch-refresh">↻ Refresh</button></div>` +
-    `<div class="stack">${blocks}</div>`;
+    `<div class="stack">${playoffBracketHTML(weeks, schCache)}${blocks}</div>`;
   $("#sch-refresh").addEventListener("click", () => { schCache = null; renderActive(); });
+}
+
+// A visual QF → SF → Championship bracket from the playoff schedule docs. Slots
+// read "TBD" until each round is seeded (the regular-season finalize creates the
+// quarterfinals; later rounds fill as weeks finalize). Winners show in gold.
+function playoffBracketHTML(weeks, cache) {
+  const pw = (weeks || []).filter((w) => w.type === "playoff").sort((a, b) => a.n - b.n);
+  if (!pw.length) return "";
+  const roundName = ["Quarterfinals", "Semifinals", "Championship"];
+  const anyData = pw.some((w) => (((cache || {})[w.n] || {}).matchups || []).length);
+  const cols = pw.map((w, i) => {
+    const sched = (cache || {})[w.n] || {};
+    const mus = sched.matchups || [];
+    const items = mus.map((mu) =>
+      `<div class="bracket-mu${mu.home === App.myTeamId || mu.away === App.myTeamId ? " is-me" : ""}">` +
+      `${mu.label ? `<div class="mu-label">${escapeHtml(mu.label)}</div>` : ""}` +
+      `<div class="bracket-team${mu.winner && mu.winner === mu.away ? " won" : ""}">${escapeHtml(mu.away ? teamName(mu.away) : "TBD")}</div>` +
+      `<div class="bracket-team${mu.winner && mu.winner === mu.home ? " won" : ""}">${escapeHtml(mu.home ? teamName(mu.home) : "TBD")}</div></div>`).join("")
+      || `<div class="empty-note">TBD</div>`;
+    const byes = (i === 0 && sched.byes && sched.byes.length)
+      ? `<div class="bracket-mu"><div class="mu-label">Byes · seeds 1–2</div>` +
+        sched.byes.map((id) => `<div class="bracket-team">${escapeHtml(teamName(id))}</div>`).join("") + `</div>` : "";
+    return `<div class="bracket-col"><div class="bracket-round">${roundName[i] || ("Week " + w.n)}</div>${byes}${items}</div>`;
+  }).join("");
+  return `<div class="card"><h3>Playoff bracket</h3>` +
+    (anyData ? "" : `<p class="hint">Seeds and matchups fill in when the regular season ends.</p>`) +
+    `<div class="bracket">${cols}</div></div>`;
 }

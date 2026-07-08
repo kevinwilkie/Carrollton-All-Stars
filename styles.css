@@ -239,6 +239,16 @@ html[data-theme="vintage"] .gl-table td { border-bottom-color: rgba(34,51,92,.08
 .mu-detail-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 @media (max-width: 700px) { .mu-detail-cols { grid-template-columns: 1fr; } }
 
+/* Playoff bracket (Schedule tab) — columns scroll horizontally on phones */
+.bracket { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 4px; }
+.bracket-col { flex: 0 0 180px; display: flex; flex-direction: column; gap: 10px; }
+.bracket-round { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); font-weight: 800; }
+.bracket-mu { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 8px; }
+.bracket-mu.is-me { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.bracket-mu .mu-label { color: var(--muted); font-size: 10px; margin-bottom: 4px; }
+.bracket-team { padding: 3px 4px; font-weight: 700; font-size: 13px; }
+.bracket-team.won { color: var(--gold); }
+
 /* ---------------- Standings ---------------- */
 .standings-table { width: 100%; border-collapse: collapse; font-size: 14px; }
 .standings-table th { text-align: right; color: var(--muted); font-size: 12px; padding: 6px; border-bottom: 1px solid var(--line); }
