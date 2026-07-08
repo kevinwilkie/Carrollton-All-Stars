@@ -24,6 +24,21 @@ function watch(page) {
   return errs;
 }
 
+// The suite exercises the app in local (no-Firebase) mode. That mode kicks in
+// only when the Firebase compat SDK fails to load (initFirebaseApp → null);
+// otherwise the app initializes Firebase, waits for auth, and the sign-in gate
+// overlay covers the page — so clicks on the hamburger / draft rows time out.
+// A dev sandbox usually can't reach the CDN so it "just works", but CI has
+// internet and the gate appears. Block the Firebase CDN + auth endpoints on
+// every page so local mode is deterministic in both environments.
+async function newPage() {
+  const p = await browser.newPage();
+  await p.route(
+    /gstatic\.com|firebasejs|firebaseio\.com|googleapis\.com|identitytoolkit|firebaseapp\.com/,
+    (r) => r.abort());
+  return p;
+}
+
 // Inject a signed-in season-app state with a small roster (no Firebase needed).
 async function seedSeason(page, role = "commish") {
   await page.evaluate((role) => {
@@ -53,7 +68,7 @@ async function seedSeason(page, role = "commish") {
 }
 
 test("draft board: loads, records a pick, deducts budget, undoes", async () => {
-  const page = await browser.newPage();
+  const page = await newPage();
   const errs = watch(page);
   await page.goto(`${BASE}/draft/`, { waitUntil: "networkidle" });
   await page.evaluate(() => localStorage.clear());
@@ -91,7 +106,7 @@ test("draft board: loads, records a pick, deducts budget, undoes", async () => {
 });
 
 test("season app: every view renders in local mode with no JS errors", async () => {
-  const page = await browser.newPage();
+  const page = await newPage();
   const errs = watch(page);
   await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
   assert.ok((await page.title()).includes("Fantasy Baseball"));
@@ -104,7 +119,7 @@ test("season app: every view renders in local mode with no JS errors", async () 
 });
 
 test("nav: 4 top tabs, hamburger opens the menu and navigates", async () => {
-  const page = await browser.newPage();
+  const page = await newPage();
   const errs = watch(page);
   await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
   assert.equal(await page.locator(".tabs .tab").count(), 4);
@@ -121,7 +136,7 @@ test("nav: 4 top tabs, hamburger opens the menu and navigates", async () => {
 });
 
 test("My Team: position picker moves a player and the card offers Drop", async () => {
-  const page = await browser.newPage();
+  const page = await newPage();
   const errs = watch(page);
   await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
   await seedSeason(page);
@@ -149,7 +164,7 @@ test("My Team: position picker moves a player and the card offers Drop", async (
 });
 
 test("Players tab: free agents sort by season points and open a card", async () => {
-  const page = await browser.newPage();
+  const page = await newPage();
   const errs = watch(page);
   await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
   await seedSeason(page);
@@ -166,7 +181,7 @@ test("Players tab: free agents sort by season points and open a card", async () 
 });
 
 test("settings: theme toggle + team profile editor, header has no stray controls", async () => {
-  const page = await browser.newPage();
+  const page = await newPage();
   const errs = watch(page);
   await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
   // the old header pills/links/theme button are gone
@@ -194,7 +209,7 @@ test("settings: theme toggle + team profile editor, header has no stray controls
 });
 
 test("error surfacing: a failed load shows a Retry card, not a spinner", async () => {
-  const page = await browser.newPage();
+  const page = await newPage();
   const errs = watch(page);
   await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
   await page.evaluate(() => {
