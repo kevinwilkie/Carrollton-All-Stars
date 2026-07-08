@@ -31,17 +31,17 @@
   // This file is the single source; the rules file needs no per-owner editing.
   const LEAGUE_TEAMS = [
     { id: "acuna-matata",   name: "Acuña Matata",                  owner: "Kevin Wilkie",    emails: ["kevin.wilkie@campusoutreach.org", "kevinwilkie92@gmail.com"] },
-    { id: "rally-cats",     name: "Rally Cats",                    owner: "Katie Pollard",   emails: ["TODO-katie@example.com"] },
-    { id: "speedster",      name: "kylespayde518's Speedster",     owner: "Kyle Spayde",     emails: ["TODO-kyle@example.com"] },
-    { id: "jump",           name: "Might as well JUMP!",           owner: "Michael Bearden", emails: ["TODO-michael@example.com"] },
-    { id: "hogans-heroes",  name: "Hogan's Heroes",                owner: "Ed Hogan",        emails: ["TODO-ed@example.com"] },
-    { id: "witt-wisdom",    name: "Witt and Wisdom",               owner: "Anthony Amato",   emails: ["TODO-anthony@example.com"] },
-    { id: "en-fuego",       name: "Coming En Fuego",               owner: "Curtis Gann",     emails: ["TODO-curtis@example.com"] },
-    { id: "beer-snobs",     name: "Dream City Beer Snobs",         owner: "Joel Pollard",    emails: ["TODO-joel@example.com"] },
+    { id: "rally-cats",     name: "Rally Cats",                    owner: "Katie Pollard",   emails: ["katiehpollard@gmail.com"] },
+    { id: "speedster",      name: "kylespayde518's Speedster",     owner: "Kyle Spayde",     emails: ["kylespayde518@gmail.com"] },
+    { id: "jump",           name: "Might as well JUMP!",           owner: "Michael Bearden", emails: ["mbearde3@gmail.com"] },
+    { id: "hogans-heroes",  name: "Hogan's Heroes",                owner: "Ed Hogan",        emails: ["edhogan412@gmail.com"] },
+    { id: "witt-wisdom",    name: "Witt and Wisdom",               owner: "Anthony Amato",   emails: ["giantsyankees27@gmail.com"] },
+    { id: "en-fuego",       name: "Coming En Fuego",               owner: "Curtis Gann",     emails: ["cgann39@gmail.com"] },
+    { id: "beer-snobs",     name: "Dream City Beer Snobs",         owner: "Joel Pollard",    emails: ["joelrpollard@gmail.com"] },
     { id: "ozzies-fish",    name: "Ozzie's Pet Fish",              owner: "Sam Pollard",     emails: ["TODO-sam@example.com"] },
-    { id: "cousin-vinnie",  name: "My Cousin Vinnie",              owner: "Joe Ingui",       emails: ["TODO-joe@example.com"] },
-    { id: "ace-dan",        name: "Ace Dan",                       owner: "Dan Moffitt",     emails: ["TODO-dan@example.com"] },
-    { id: "baldwin-bro",    name: "Drake is the Best Baldwin Bro", owner: "Richie Valdes",   emails: ["TODO-richie@example.com"] },
+    { id: "cousin-vinnie",  name: "My Cousin Vinnie",              owner: "Joe Ingui",       emails: ["joseph.ingui02@gmail.com"] },
+    { id: "ace-dan",        name: "Ace Dan",                       owner: "Dan Moffitt",     emails: ["dmoffitt2@gmail.com"] },
+    { id: "baldwin-bro",    name: "Drake is the Best Baldwin Bro", owner: "Richie Valdes",   emails: ["richievaldes80@gmail.com"] },
   ];
 
   // Commissioner Google account(s). Must match database.rules.json (RTDB) and

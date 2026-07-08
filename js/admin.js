@@ -19,11 +19,16 @@ function renderAdmin() {
     `<div class="view-head"><h2>Commissioner Tools</h2></div>` +
     `<div class="admin-grid">` +
 
-    `<div class="card"><h3>1 · Seed league</h3>` +
-    `<p class="hint">Creates/updates the 12 team documents from <code>shared/league-config.js</code> ` +
-    `(names, owner emails, $${FAAB.budget} FAAB) and the members allowlist the security rules read. ` +
-    `Re-run this whenever you add a real owner email. Safe to re-run — records are preserved.</p>` +
-    `<button class="btn" id="ad-seed">Seed teams</button></div>` +
+    `<div class="card"><h3>1 · Owners &amp; seeding</h3>` +
+    `<p class="hint"><b>Sync owner emails</b> updates each team's allowed sign-in addresses and the ` +
+    `members allowlist the security rules read — and nothing else. Run this whenever you add a real ` +
+    `owner email; it's safe mid-season (won't touch FAAB, records, or custom team names).</p>` +
+    `<button class="btn" id="ad-sync-owners">Sync owner emails</button>` +
+    `<p class="hint" style="margin-top:14px"><b>Full seed</b> (re)creates the 12 team docs from ` +
+    `<code>shared/league-config.js</code> — names + owner emails — and <b>resets FAAB to $${FAAB.budget}</b>. ` +
+    `Records (W/L) and logos are preserved, but this overwrites custom team names and spent FAAB, so use it ` +
+    `before the season, not mid-test.</p>` +
+    `<button class="btn btn-ghost" id="ad-seed">Full seed</button></div>` +
 
     `<div class="card"><h3>2 · Week map</h3>` +
     `<p class="hint">${weeks.length ? `${weeks.length} weeks configured (${weeks[0].start} → ${weeks[weeks.length - 1].end}).`
@@ -59,6 +64,7 @@ function renderAdmin() {
 
     `</div>`;
 
+  $("#ad-sync-owners").addEventListener("click", adminSyncOwners);
   $("#ad-seed").addEventListener("click", adminSeed);
   $("#ad-build-weeks").addEventListener("click", adminBuildWeeks);
   $("#ad-save-weeks").addEventListener("click", adminSaveWeeks);
@@ -66,6 +72,28 @@ function renderAdmin() {
   $("#ad-faab-save").addEventListener("click", adminSetFaab);
   host.querySelectorAll("[data-force]").forEach((b) => b.addEventListener("click", () => adminTrade(b.dataset.force, "executed")));
   host.querySelectorAll("[data-kill]").forEach((b) => b.addEventListener("click", () => adminTrade(b.dataset.kill, "vetoed")));
+}
+
+// Non-destructive: writes ONLY each team's ownerEmails + the members allowlist
+// that firestore.rules reads. Safe to run mid-season — leaves FAAB, records,
+// and owner-customized team names untouched (unlike the full seed).
+async function adminSyncOwners() {
+  try {
+    const batch = App.fs.batch();
+    LEAGUE_TEAMS.forEach((t) => {
+      batch.set(L().collection("teams").doc(t.id), {
+        ownerEmails: (t.emails || []).filter(isRealEmail),
+      }, { merge: true });
+    });
+    const members = memberEmails();
+    batch.set(L().collection("config").doc("members"), {
+      emails: members, updatedAt: new Date().toISOString(),
+    });
+    await batch.commit();
+    const missing = LEAGUE_TEAMS.filter((t) => !(t.emails || []).some(isRealEmail)).length;
+    toast(`Owners synced · ${members.length} member email${members.length === 1 ? "" : "s"}` +
+      (missing ? ` · ${missing} team${missing === 1 ? "" : "s"} still placeholder` : ""), "success");
+  } catch (e) { toast("Sync failed: " + e.message, "error"); }
 }
 
 async function adminSeed() {
