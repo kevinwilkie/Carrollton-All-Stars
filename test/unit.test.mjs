@@ -13,6 +13,7 @@ import ScheduleGen from "../shared/schedule-gen.js";
 import { isCalledOff } from "../netlify/functions/lib/ingest.mjs";
 import { extractStatLines } from "../netlify/functions/lib/mlb.mjs";
 import { worseRecordFirst } from "../netlify/functions/lib/league.mjs";
+import { careerFromStats } from "../netlify/functions/career.mjs";
 
 // ---------------------------------------------------------------- scoring engine
 test("scoring: hitting line (single + double + HR + walk + K)", () => {
@@ -75,6 +76,49 @@ test("waivers: worseRecordFirst orders worse record first, deterministically", (
   assert.notEqual(r, 0, "a stable tiebreak is applied to a true tie");
   assert.equal(worseRecordFirst(t1, t2), r, "same result on every call");
   assert.equal(Math.sign(worseRecordFirst(t2, t1)), -Math.sign(r), "antisymmetric on the tiebreak");
+});
+
+// ----------------------------------------------------------- career stats
+test("career: hitter season fantasy points are exact from season totals", () => {
+  const api = { stats: [{ type: { displayName: "yearByYear" }, group: { displayName: "hitting" }, splits: [
+    { season: "2025", team: { abbreviation: "SEA" },
+      stat: { gamesPlayed: 150, atBats: 550, hits: 150, doubles: 30, triples: 2, homeRuns: 40,
+        baseOnBalls: 60, intentionalWalks: 5, runs: 90, rbi: 110, stolenBases: 10, strikeOuts: 140, plateAppearances: 620 } },
+  ] }] };
+  const out = careerFromStats(api, "hitting", 2026);
+  assert.equal(out.rows.length, 1);
+  const r = out.rows[0];
+  // fp must equal the engine's scoreHitting on the same totals (singles = 150-30-2-40 = 78)
+  assert.equal(r.fp, Scoring.round1(Scoring.scoreHitting(r.stat)));
+  assert.equal(r.team, "SEA");
+});
+
+test("career: a traded season aggregates its team-splits into one row", () => {
+  const api = { stats: [{ type: { displayName: "yearByYear" }, group: { displayName: "hitting" }, splits: [
+    { season: "2024", team: { abbreviation: "CIN" }, stat: { gamesPlayed: 80, atBats: 300, hits: 90, homeRuns: 10, rbi: 40, runs: 45, baseOnBalls: 20, strikeOuts: 60 } },
+    { season: "2024", team: { abbreviation: "LAD" }, stat: { gamesPlayed: 60, atBats: 220, hits: 66, homeRuns: 8, rbi: 30, runs: 35, baseOnBalls: 15, strikeOuts: 45 } },
+  ] }] };
+  const out = careerFromStats(api, "hitting", 2026);
+  assert.equal(out.rows.length, 1);
+  assert.equal(out.rows[0].team, "2TM");
+  assert.equal(out.rows[0].stat.hits, 156);       // 90 + 66
+  assert.equal(out.rows[0].stat.homeRuns, 18);    // 10 + 8
+});
+
+test("career: pitcher QS bonus comes from the season count, not a spurious aggregate QS", () => {
+  const api = { stats: [{ type: { displayName: "yearByYear" }, group: { displayName: "pitching" }, splits: [
+    { season: "2025", team: { abbreviation: "MIA" },
+      stat: { gamesPlayed: 32, gamesStarted: 32, wins: 14, losses: 6, saves: 0, holds: 0,
+        inningsPitched: "200.0", outs: 600, hits: 160, earnedRuns: 60, baseOnBalls: 45,
+        strikeOuts: 220, completeGames: 1, shutouts: 0, qualityStarts: 22 } },
+  ] }] };
+  const out = careerFromStats(api, "pitching", 2026);
+  const r = out.rows[0];
+  // Engine with gamesStarted:0 (no per-game QS) + 22 real QS × 5.
+  const base = Scoring.scorePitching({ ...r.stat, gamesStarted: 0 });
+  assert.equal(r.fp, Scoring.round1(base + 22 * 5));
+  // sanity: the QS bonus (110) is actually included
+  assert.ok(r.fp > base);
 });
 
 // --------------------------------------------------------------- feasibility

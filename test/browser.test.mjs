@@ -180,6 +180,37 @@ test("Players tab: free agents sort by season points and open a card", async () 
   await page.close();
 });
 
+test("player card: Stats tab renders a career table with a fantasy-points column", async () => {
+  const page = await browser.newPage();
+  const errs = watch(page);
+  // Mock the career Netlify function (no MLB API / server in tests).
+  await page.route("**/functions/career**", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
+      ok: true, id: "1", group: "hitting", season: 2026,
+      rows: [
+        { season: "2026", team: "SEA", numTeams: 1, fp: 200, stat: { gamesPlayed: 90, atBats: 340, runs: 55, hits: 100, doubles: 22, triples: 1, homeRuns: 28, rbi: 70, baseOnBalls: 45, stolenBases: 4, strikeOuts: 110 } },
+        { season: "2025", team: "SEA", numTeams: 1, fp: 410, stat: { gamesPlayed: 150, atBats: 560, runs: 90, hits: 150, doubles: 30, triples: 2, homeRuns: 40, rbi: 110, baseOnBalls: 60, stolenBases: 10, strikeOuts: 140 } },
+      ],
+      career: { fp: 610, stat: { gamesPlayed: 240, atBats: 900, runs: 145, hits: 250, doubles: 52, triples: 3, homeRuns: 68, rbi: 180, baseOnBalls: 105, stolenBases: 14, strikeOuts: 250 } },
+    }) }));
+  await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
+  await seedSeason(page);
+  await page.evaluate(() => setTab("myteam"));
+  await page.waitForTimeout(150);
+  await page.evaluate(() => document.querySelector('.lu-player[data-act="card"]').click());
+  await page.waitForTimeout(100);
+  await page.click('#mt-sheet .pc-tab[data-tab="stats"]');
+  await page.waitForTimeout(150);
+  assert.match(await page.textContent("#mt-sheet .gl-table thead"), /FP/, "has a fantasy-points column");
+  // two seasons + a career total row
+  assert.equal(await page.locator("#mt-sheet .gl-table tbody tr").count(), 3);
+  // the current season's FP is overridden by our exact scored total (Cal Raleigh = 210)
+  assert.equal(await page.evaluate(() =>
+    document.querySelector("#mt-sheet .gl-table tbody tr.is-cur .gl-pts").textContent), "210");
+  assert.deepEqual(realErrors(errs), []);
+  await page.close();
+});
+
 test("settings: theme toggle + team profile editor, header has no stray controls", async () => {
   const page = await newPage();
   const errs = watch(page);

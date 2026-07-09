@@ -134,6 +134,23 @@ async function loadGameLog(mlbId) {
   return rows;
 }
 
+// A player's season-by-season career stats (from the career Netlify function,
+// which proxies the MLB API and scores each season). Cached per person+group.
+const _careerCache = {};
+async function loadCareer(mlbId, group) {
+  const personId = +(String(mlbId).match(/^\d+/) || [0])[0];
+  if (!personId) return null;
+  const g = group === "pitching" ? "pitching" : "hitting";
+  const key = personId + ":" + g;
+  if (_careerCache[key]) return _careerCache[key];
+  const res = await fetch(`/.netlify/functions/career?id=${personId}&group=${g}`);
+  if (!res.ok) throw new Error(`career ${res.status}`);
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.error || "career unavailable");
+  _careerCache[key] = data;
+  return data;
+}
+
 // ---- writes -----------------------------------------------------------------------
 async function saveLineupSlots(slots) {
   const ref = L().collection("lineups").doc(`${App.myTeamId}_${App.date}`);

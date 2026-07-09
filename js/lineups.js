@@ -554,6 +554,7 @@ function openPlayerCard(id) {
     `<div class="pc-tiles">${tiles.map(([v, l]) => `<div class="pc-tile"><b>${v}</b><span>${l}</span></div>`).join("")}</div>` +
     `</div>` +
     `<div class="pc-tabs"><button class="pc-tab on" data-tab="summary">Summary</button>` +
+    `<button class="pc-tab" data-tab="stats">Stats</button>` +
     `<button class="pc-tab" data-tab="log">Game Log</button></div>` +
     `<div class="pc-body">${summaryHTML}</div>` +
     actions;
@@ -563,7 +564,15 @@ function openPlayerCard(id) {
   const pitcher = /:P$/.test(String(id)) || (!/:B$/.test(String(id)) && isPitcherPlayer(p));
   host.querySelectorAll(".pc-tab").forEach((t) => t.addEventListener("click", () => {
     host.querySelectorAll(".pc-tab").forEach((x) => x.classList.toggle("on", x === t));
-    if (t.dataset.tab === "summary") { bodyEl.innerHTML = summaryHTML; return; }
+    const tab = t.dataset.tab;
+    if (tab === "summary") { bodyEl.innerHTML = summaryHTML; return; }
+    if (tab === "stats") {
+      bodyEl.innerHTML = `<p class="hint">Loading career stats…</p>`;
+      loadCareer(id, pitcher ? "pitching" : "hitting")
+        .then((data) => { bodyEl.innerHTML = careerTable(data, pitcher, live.seasonPoints); })
+        .catch(() => { bodyEl.innerHTML = `<p class="hint">Career stats aren't available right now.</p>`; });
+      return;
+    }
     bodyEl.innerHTML = `<p class="hint">Loading game log…</p>`;
     loadGameLog(id).then((rows) => { bodyEl.innerHTML = gameLogTable(rows, pitcher); })
       .catch(() => { bodyEl.innerHTML = `<p class="hint">Game log isn't available right now.</p>`; });
@@ -619,6 +628,53 @@ function gameLogTable(rows, pitcher) {
   }).join("");
   return `<div class="scroll-x gl-wrap"><table class="gl-table"><thead>${head}</thead><tbody>${body}</tbody></table></div>` +
     `<p class="hint">${games.length} game${games.length > 1 ? "s" : ""} · fantasy points by our scoring.</p>`;
+}
+
+// Season-by-season career stats with a fantasy-points column. The current
+// season's points come from our own exact scored statlines (liveSeasonPts) and
+// override the API-derived estimate so it matches the card's SEASON tile.
+function careerTable(data, pitcher, liveSeasonPts) {
+  const rows = (data && data.rows) || [];
+  if (!rows.length) return `<p class="hint">No career stats available.</p>`;
+  const s0 = String(data.season);
+  const useLive = liveSeasonPts != null && Number.isFinite(+liveSeasonPts);
+  const avg = (h, ab) => { if (!ab) return "—"; const v = (h / ab).toFixed(3); return v[0] === "0" ? v.slice(1) : v; };
+  const era = (er, outs) => (outs ? (er * 27 / outs).toFixed(2) : "—");
+  const ipStr = (outs) => `${Math.floor((outs || 0) / 3)}.${(outs || 0) % 3}`;
+
+  const cols = pitcher
+    ? [["G", (s) => s.gamesPlayed], ["GS", (s) => s.gamesStarted], ["W", (s) => s.wins],
+       ["L", (s) => s.losses], ["SV", (s) => s.saves], ["HLD", (s) => s.holds],
+       ["IP", (s) => ipStr(s.outs)], ["H", (s) => s.hits], ["ER", (s) => s.earnedRuns],
+       ["BB", (s) => s.baseOnBalls], ["K", (s) => s.strikeOuts], ["ERA", (s) => era(s.earnedRuns, s.outs)]]
+    : [["G", (s) => s.gamesPlayed], ["AB", (s) => s.atBats], ["R", (s) => s.runs],
+       ["H", (s) => s.hits], ["2B", (s) => s.doubles], ["3B", (s) => s.triples],
+       ["HR", (s) => s.homeRuns], ["RBI", (s) => s.rbi], ["BB", (s) => s.baseOnBalls],
+       ["SB", (s) => s.stolenBases], ["SO", (s) => s.strikeOuts], ["AVG", (s) => avg(s.hits, s.atBats)]];
+
+  const fpOf = (r) => (useLive && r.season === s0 ? Scoring.round1(+liveSeasonPts) : r.fp);
+  const head = `<tr><th class="ta-left">Year</th><th class="ta-left">Tm</th>` +
+    cols.map(([h]) => `<th>${h}</th>`).join("") + `<th>FP</th></tr>`;
+  const body = rows.map((r) => {
+    const cur = r.season === s0;
+    return `<tr${cur ? ` class="is-cur"` : ""}><td class="ta-left">${escapeHtml(r.season)}</td>` +
+      `<td class="ta-left">${escapeHtml(r.team || "—")}</td>` +
+      cols.map(([, f]) => `<td>${escapeHtml(String(f(r.stat) ?? 0))}</td>`).join("") +
+      `<td class="gl-pts">${fpOf(r)}</td></tr>`;
+  }).join("");
+
+  let careerFp = data.career ? data.career.fp : 0;
+  const curRow = rows.find((r) => r.season === s0);
+  if (useLive && curRow) careerFp = Scoring.round1(careerFp - curRow.fp + (+liveSeasonPts));
+  const foot = data.career
+    ? `<tr class="is-career"><td class="ta-left">Career</td><td></td>` +
+      cols.map(([, f]) => `<td>${escapeHtml(String(f(data.career.stat) ?? 0))}</td>`).join("") +
+      `<td class="gl-pts">${careerFp}</td></tr>`
+    : "";
+  return `<div class="scroll-x gl-wrap"><table class="gl-table"><thead>${head}</thead>` +
+    `<tbody>${body}${foot}</tbody></table></div>` +
+    `<p class="hint">Fantasy points by our scoring — the current season is exact; ` +
+    `prior seasons are estimated from season totals.</p>`;
 }
 
 function setupNotice() {
