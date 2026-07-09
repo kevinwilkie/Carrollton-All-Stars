@@ -653,12 +653,14 @@ function careerTable(data, pitcher, liveSeasonPts) {
        ["SB", (s) => s.stolenBases], ["SO", (s) => s.strikeOuts], ["AVG", (s) => avg(s.hits, s.atBats)]];
 
   const fpOf = (r) => (useLive && r.season === s0 ? Scoring.round1(+liveSeasonPts) : r.fp);
+  // Server sends a display string when it can; otherwise a team id to resolve.
+  const teamOf = (r) => r.team || (r.teamId != null ? mlbAbbr(r.teamId) : "") || "—";
   const head = `<tr><th class="ta-left">Year</th><th class="ta-left">Tm</th>` +
     cols.map(([h]) => `<th>${h}</th>`).join("") + `<th>FP</th></tr>`;
   const body = rows.map((r) => {
     const cur = r.season === s0;
     return `<tr${cur ? ` class="is-cur"` : ""}><td class="ta-left">${escapeHtml(r.season)}</td>` +
-      `<td class="ta-left">${escapeHtml(r.team || "—")}</td>` +
+      `<td class="ta-left">${escapeHtml(teamOf(r))}</td>` +
       cols.map(([, f]) => `<td>${escapeHtml(String(f(r.stat) ?? 0))}</td>`).join("") +
       `<td class="gl-pts">${fpOf(r)}</td></tr>`;
   }).join("");

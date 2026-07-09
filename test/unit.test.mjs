@@ -121,6 +121,17 @@ test("career: a traded season aggregates its team-splits into one row", () => {
   assert.equal(out.rows[0].stat.homeRuns, 18);    // 10 + 8
 });
 
+test("career: a real split carries team.id (no abbr) → server passes teamId for the client", () => {
+  const api = { stats: [{ type: { displayName: "yearByYear" }, group: { displayName: "hitting" }, splits: [
+    { season: "2026", team: { id: 136, name: "Seattle Mariners" },
+      stat: { gamesPlayed: 61, atBats: 229, hits: 39, homeRuns: 9, rbi: 29, runs: 23, baseOnBalls: 31, strikeOuts: 60 } },
+  ] }] };
+  const out = careerFromStats(api, "hitting", 2026);
+  assert.equal(out.rows[0].teamId, 136);
+  assert.equal(out.rows[0].team, null);   // abbreviation isn't in yearByYear splits
+  assert.equal(out.rows[0].numTeams, 1);
+});
+
 test("career: pitcher QS bonus comes from the season count, not a spurious aggregate QS", () => {
   const api = { stats: [{ type: { displayName: "yearByYear" }, group: { displayName: "pitching" }, splits: [
     { season: "2025", team: { abbreviation: "MIA" },

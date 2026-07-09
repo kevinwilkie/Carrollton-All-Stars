@@ -59,17 +59,27 @@ export function careerFromStats(api, group, currentSeason) {
     const row = bySeason[yr] || (bySeason[yr] = { season: yr, teams: [], sum: emptySum(fields) });
     if (pitching) row.sum.outs = row.sum.outs || 0;
     addInto(row.sum, sp.stat || {}, fields, pitching);
-    if (sp.team && sp.team.abbreviation) row.teams.push(sp.team.abbreviation);
+    // yearByYear splits carry team.id (+ name); abbreviation isn't included, so
+    // keep both — the client resolves an id to an abbr via its TEAMS map.
+    if (sp.team && (sp.team.id != null || sp.team.abbreviation)) {
+      row.teams.push({ id: sp.team.id != null ? sp.team.id : null, abbr: sp.team.abbreviation || null });
+    }
   });
 
   const rows = Object.values(bySeason)
-    .map((r) => ({
-      season: r.season,
-      team: r.teams.length === 1 ? r.teams[0] : (r.teams.length ? r.teams.length + "TM" : "—"),
-      numTeams: r.teams.length,
-      stat: r.sum,
-      fp: seasonFantasyPoints(r.sum, pitching),
-    }))
+    .map((r) => {
+      const uniq = [...new Map(r.teams.map((t) => [t.id != null ? t.id : t.abbr, t])).values()];
+      return {
+        season: r.season,
+        // display string when we can build one server-side; else null + teamId
+        // so the client maps the id to an abbreviation.
+        team: uniq.length > 1 ? uniq.length + "TM" : (uniq.length === 1 ? (uniq[0].abbr || null) : "—"),
+        teamId: uniq.length === 1 ? uniq[0].id : null,
+        numTeams: uniq.length,
+        stat: r.sum,
+        fp: seasonFantasyPoints(r.sum, pitching),
+      };
+    })
     .sort((a, b) => (a.season < b.season ? 1 : -1));
 
   const total = emptySum(fields);
