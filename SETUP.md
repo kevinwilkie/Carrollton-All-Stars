@@ -136,9 +136,17 @@ ingest was down for a stretch, earlier game logs and weekly scores are missing. 
 to know:
 
 - **Season-to-date totals self-heal.** A player's SEASON total is recomputed every night
-  from his complete MLB season stats — so once the jobs are running, force one
-  **daily-rollover** (Netlify → Functions → daily-rollover → *Run*) and the SEASON tile,
-  the player-card Stats tab, and the free-agent sort are correct, no replay needed.
+  from his complete MLB season stats, so it stays correct once the jobs run. To fix it
+  **right now**, run locally (no waiting on the nightly job, no function timeout):
+
+  ```
+  node scripts/recompute_season_points.mjs
+  ```
+
+  That updates the SEASON tile, the player-card Stats tab, and the free-agent sort for every
+  player. (Manually clicking *Run* on the scheduled `daily-rollover` in the Netlify UI can
+  return "Failed to invoke function" — that path has a short timeout and isn't reliable for
+  a job this size; the local script and the nightly scheduled run are the dependable ways.)
 - **Game logs + past weekly standings need a replay.** Run, locally, with the same
   `FIREBASE_SERVICE_ACCOUNT_B64` env var:
 

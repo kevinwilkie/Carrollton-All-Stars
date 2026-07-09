@@ -69,6 +69,16 @@ export async function gameDecisions(gamePk) {
 
 const num = (v) => (Number.isFinite(+v) ? +v : 0);
 
+// Run an async fn over items with a concurrency cap (order preserved).
+async function mapLimit(items, limit, fn) {
+  const out = new Array(items.length);
+  let i = 0;
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (i < items.length) { const idx = i++; out[idx] = await fn(items[idx], idx); }
+  }));
+  return out;
+}
+
 // One game's boxscore → { [mlbId]: { name, teamId, batting, pitching, fieldPositions[] } }
 // batting/pitching keep exactly the fields shared/scoring.js consumes.
 export function extractStatLines(box, decisions = {}) {
@@ -158,11 +168,14 @@ export async function seasonScoringStats(personIds, season) {
   const ipOuts = (st) =>
     Number.isFinite(+st.outs) ? +st.outs
       : (() => { const q = String(st.inningsPitched || "0.0").split("."); return num(q[0]) * 3 + num(q[1]); })();
-  for (let i = 0; i < ids.length; i += 40) {
-    const chunk = ids.slice(i, i + 40).join(",");
-    const d = await fetchJson(
-      `${BASE}/people?personIds=${chunk}&hydrate=stats(group=[hitting,pitching],type=[season],season=${season})`);
-    (d.people || []).forEach((p) => {
+  const chunks = [];
+  for (let i = 0; i < ids.length; i += 40) chunks.push(ids.slice(i, i + 40).join(","));
+  // Fetch batches concurrently (capped) — sequential calls for ~1,300 players
+  // would blow the function's time budget.
+  const results = await mapLimit(chunks, 8, (chunk) => fetchJson(
+    `${BASE}/people?personIds=${chunk}&hydrate=stats(group=[hitting,pitching],type=[season],season=${season})`));
+  results.forEach((d) => {
+    ((d && d.people) || []).forEach((p) => {
       const rec = { hitting: null, pitching: null };
       (p.stats || []).forEach((s) => {
         const group = s.group?.displayName;
@@ -180,7 +193,7 @@ export async function seasonScoringStats(personIds, season) {
       });
       out[p.id] = rec;
     });
-  }
+  });
   return out;
 }
 

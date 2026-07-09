@@ -100,17 +100,24 @@ export async function syncPlayers(yesterday, season) {
   // an ingest outage (it silently misses the days it wasn't running); the
   // aggregate is the player's full-season total every night, self-healing.
   const aggIds = Object.keys(updates);
-  const agg = await MLB.seasonScoringStats(aggIds, season);
-  aggIds.forEach((id) => {
-    const u = updates[id];
-    const a = agg[(String(id).match(/^\d+/) || [])[0]] || {};
-    if (TWO_WAY.has(id)) {
-      u.seasonPointsB = seasonFantasyPoints(a.hitting, false);
-      u.seasonPointsP = seasonFantasyPoints(a.pitching, true);
-    } else {
-      u.seasonPoints = Scoring.round1(seasonFantasyPoints(a.hitting, false) + seasonFantasyPoints(a.pitching, true));
-    }
-  });
+  try {
+    const agg = await MLB.seasonScoringStats(aggIds, season);
+    aggIds.forEach((id) => {
+      const u = updates[id];
+      const a = agg[(String(id).match(/^\d+/) || [])[0]] || {};
+      if (TWO_WAY.has(id)) {
+        u.seasonPointsB = seasonFantasyPoints(a.hitting, false);
+        u.seasonPointsP = seasonFantasyPoints(a.pitching, true);
+      } else {
+        u.seasonPoints = Scoring.round1(seasonFantasyPoints(a.hitting, false) + seasonFantasyPoints(a.pitching, true));
+      }
+    });
+  } catch (e) {
+    // Don't fail the whole sync if the season-stats fetch is slow/unavailable;
+    // keep the prior seasonPoints and let the next run (or the recompute
+    // script) reconcile.
+    console.warn("season points recompute skipped:", e && e.message);
+  }
 
   // ---- split two-way people back into their :B / :P fantasy players ----
   Object.keys(updates).filter((pid) => TWO_WAY.has(pid)).forEach((pid) => {
