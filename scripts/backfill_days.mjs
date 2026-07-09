@@ -14,6 +14,10 @@
  */
 import { ensureLineups } from "../netlify/functions/lib/lineups.mjs";
 import { ingestDate } from "../netlify/functions/lib/ingest.mjs";
+import { finalizeWeekIfEnded } from "../netlify/functions/lib/standings.mjs";
+import { recomputeSeasonPoints } from "../netlify/functions/lib/players-sync.mjs";
+import { leagueRef } from "../netlify/functions/lib/firebase.mjs";
+import { CFG } from "../netlify/functions/lib/league.mjs";
 
 const arg = (name, dflt) => {
   const i = process.argv.indexOf("--" + name);
@@ -34,4 +38,20 @@ for (let date = FROM; date <= TO; date = addDays(date, 1)) {
   const out = await ingestDate(date);
   console.log(`${date}: lineups created ${created}, games ${out.games}, statlines ${out.statlines}`);
 }
+
+// Settle every week that ended on/before TO (records, standings, playoff seeds).
+// finalizeWeekIfEnded does one earliest-unfinalized week per call, so loop.
+let finalized = 0;
+while (await finalizeWeekIfEnded(TO)) finalized++;
+console.log(`✓ finalized ${finalized} week(s)`);
+
+// Reconcile season-to-date fantasy points from the complete MLB season aggregate
+// (the replayed statlines above only cover [FROM..TO]).
+let season = CFG.LEAGUE.season;
+try {
+  const s = (await leagueRef().collection("config").doc("settings").get()).data();
+  if (s && s.season) season = s.season;
+} catch (e) { /* keep default */ }
+const n = await recomputeSeasonPoints(season);
+console.log(`✓ recomputed season points for ${n} players (season ${season})`);
 console.log("✓ backfill complete");

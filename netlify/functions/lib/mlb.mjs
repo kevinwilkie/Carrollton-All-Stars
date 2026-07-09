@@ -147,6 +147,43 @@ export function ilStatusFromCode(code) {
   return m[1] ? `IL${m[1]}` : "IL";
 }
 
+// Full season hitting + pitching stat lines for a batch of players, for
+// season-to-date fantasy scoring. Returns { [personId]: { hitting, pitching } }
+// where each is the summed season stat object (or null). A traded player can
+// come back as multiple splits, so counting stats are summed and outs are
+// recomputed from each split's innings.
+export async function seasonScoringStats(personIds, season) {
+  const out = {};
+  const ids = [...new Set(personIds.map((x) => (String(x).match(/^\d+/) || [])[0]).filter(Boolean))];
+  const ipOuts = (st) =>
+    Number.isFinite(+st.outs) ? +st.outs
+      : (() => { const q = String(st.inningsPitched || "0.0").split("."); return num(q[0]) * 3 + num(q[1]); })();
+  for (let i = 0; i < ids.length; i += 40) {
+    const chunk = ids.slice(i, i + 40).join(",");
+    const d = await fetchJson(
+      `${BASE}/people?personIds=${chunk}&hydrate=stats(group=[hitting,pitching],type=[season],season=${season})`);
+    (d.people || []).forEach((p) => {
+      const rec = { hitting: null, pitching: null };
+      (p.stats || []).forEach((s) => {
+        const group = s.group?.displayName;
+        if (group !== "hitting" && group !== "pitching") return;
+        const splits = (s.splits || []).filter((sp) => !sp.sport || sp.sport.id === 1);
+        if (!splits.length) return;
+        const agg = {}; let outs = 0;
+        splits.forEach((sp) => {
+          const st = sp.stat || {};
+          Object.entries(st).forEach(([k, v]) => { if (typeof v === "number") agg[k] = (agg[k] || 0) + v; });
+          outs += ipOuts(st);
+        });
+        if (group === "pitching") agg.outs = outs;
+        rec[group] = agg;
+      });
+      out[p.id] = rec;
+    });
+  }
+  return out;
+}
+
 // Season fielding/pitching splits for a batch of players (eligibility seeding).
 export async function seasonStats(personIds, season) {
   const out = {};

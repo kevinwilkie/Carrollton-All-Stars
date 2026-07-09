@@ -8,6 +8,7 @@ import Scoring from "../../../shared/scoring.js";
 import { db, leagueRef } from "./firebase.mjs";
 import { CFG } from "./league.mjs";
 import * as MLB from "./mlb.mjs";
+import { seasonFantasyPoints } from "./season-score.mjs";
 import { computePositions, eligibleSlots, normalizeAppearances } from "./eligibility.mjs";
 
 // Yahoo-style two-way splits: these person ids live as "{id}:B" + "{id}:P".
@@ -91,15 +92,24 @@ export async function syncPlayers(yesterday, season) {
       if (line.pitching.gamesStarted) u.gsThisSeason = (u.gsThisSeason || 0) + 1;
       else u.reliefThisSeason = (u.reliefThisSeason || 0) + 1;
     }
-    // Running season fantasy points (raw, before any team-level start cap). Two-
-    // way people keep the halves apart; everyone else uses the whole line.
-    if (TWO_WAY.has(id)) {
-      if (line.batting) u.seasonPointsB = Scoring.round1((u.seasonPointsB || 0) + Scoring.scoreHitting(line.batting));
-      if (line.pitching) u.seasonPointsP = Scoring.round1((u.seasonPointsP || 0) + Scoring.scorePitching(line.pitching));
-    } else {
-      u.seasonPoints = Scoring.round1((u.seasonPoints || 0) + (line.points || 0));
-    }
     u.lastCountedDate = yesterday;
+  });
+
+  // ---- season-to-date fantasy points: recompute from the COMPLETE MLB season
+  // aggregate, not an incremental daily counter. The counter couldn't survive
+  // an ingest outage (it silently misses the days it wasn't running); the
+  // aggregate is the player's full-season total every night, self-healing.
+  const aggIds = Object.keys(updates);
+  const agg = await MLB.seasonScoringStats(aggIds, season);
+  aggIds.forEach((id) => {
+    const u = updates[id];
+    const a = agg[(String(id).match(/^\d+/) || [])[0]] || {};
+    if (TWO_WAY.has(id)) {
+      u.seasonPointsB = seasonFantasyPoints(a.hitting, false);
+      u.seasonPointsP = seasonFantasyPoints(a.pitching, true);
+    } else {
+      u.seasonPoints = Scoring.round1(seasonFantasyPoints(a.hitting, false) + seasonFantasyPoints(a.pitching, true));
+    }
   });
 
   // ---- split two-way people back into their :B / :P fantasy players ----
@@ -144,6 +154,33 @@ export async function syncPlayers(yesterday, season) {
     const batch = db().batch();
     entries.slice(i, i + 450).forEach(([id, u]) =>
       batch.set(L.collection("players").doc(id), { ...u, updatedAt: new Date().toISOString() }, { merge: true }));
+    await batch.commit();
+  }
+  return entries.length;
+}
+
+// Recompute season-to-date fantasy points for EVERY existing player doc from the
+// MLB season aggregate. Used by the backfill script after a historical replay
+// (and any time the running totals need to be reconciled). Split two-way docs
+// (":B"/":P") are scored on their own half.
+export async function recomputeSeasonPoints(season) {
+  const L = leagueRef();
+  const docs = [];
+  (await L.collection("players").get()).forEach((d) => docs.push(d.id));
+  const agg = await MLB.seasonScoringStats(docs, season);
+  const at = (id) => agg[(String(id).match(/^\d+/) || [])[0]] || {};
+  const entries = docs.map((id) => {
+    const a = at(id);
+    let seasonPoints;
+    if (String(id).endsWith(":B")) seasonPoints = seasonFantasyPoints(a.hitting, false);
+    else if (String(id).endsWith(":P")) seasonPoints = seasonFantasyPoints(a.pitching, true);
+    else seasonPoints = Scoring.round1(seasonFantasyPoints(a.hitting, false) + seasonFantasyPoints(a.pitching, true));
+    return [id, seasonPoints];
+  });
+  for (let i = 0; i < entries.length; i += 450) {
+    const batch = db().batch();
+    entries.slice(i, i + 450).forEach(([id, seasonPoints]) =>
+      batch.set(L.collection("players").doc(id), { seasonPoints, updatedAt: new Date().toISOString() }, { merge: true }));
     await batch.commit();
   }
   return entries.length;

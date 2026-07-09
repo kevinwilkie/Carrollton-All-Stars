@@ -14,6 +14,7 @@ import { isCalledOff } from "../netlify/functions/lib/ingest.mjs";
 import { extractStatLines } from "../netlify/functions/lib/mlb.mjs";
 import { worseRecordFirst } from "../netlify/functions/lib/league.mjs";
 import { careerFromStats } from "../netlify/functions/career.mjs";
+import { seasonFantasyPoints, outsOf } from "../netlify/functions/lib/season-score.mjs";
 
 // ---------------------------------------------------------------- scoring engine
 test("scoring: hitting line (single + double + HR + walk + K)", () => {
@@ -76,6 +77,21 @@ test("waivers: worseRecordFirst orders worse record first, deterministically", (
   assert.notEqual(r, 0, "a stable tiebreak is applied to a true tie");
   assert.equal(worseRecordFirst(t1, t2), r, "same result on every call");
   assert.equal(Math.sign(worseRecordFirst(t2, t1)), -Math.sign(r), "antisymmetric on the tiebreak");
+});
+
+// ------------------------------------------------- season-to-date scoring
+test("season-score: hitter total is exact; pitcher adds the season QS bonus", () => {
+  const hit = { hits: 150, doubles: 30, triples: 2, homeRuns: 40, baseOnBalls: 60,
+    intentionalWalks: 5, runs: 90, rbi: 110, stolenBases: 10, strikeOuts: 140 };
+  // a whole-season aggregate scores identically to the engine on the same line
+  assert.equal(seasonFantasyPoints(hit, false), Scoring.round1(Scoring.scoreHitting(hit)));
+  const pit = { outs: 600, strikeOuts: 220, wins: 14, saves: 0, holds: 0, completeGames: 1,
+    shutouts: 0, earnedRuns: 60, hits: 160, baseOnBalls: 45, qualityStarts: 22, gamesStarted: 32 };
+  const base = Scoring.scorePitching({ ...pit, gamesStarted: 0 }); // no spurious per-aggregate QS
+  assert.equal(seasonFantasyPoints(pit, true), Scoring.round1(base + 22 * 5));
+  assert.equal(seasonFantasyPoints(null, false), 0);
+  assert.equal(outsOf({ inningsPitched: "6.2" }), 20);
+  assert.equal(outsOf({ outs: 18 }), 18);
 });
 
 // ----------------------------------------------------------- career stats

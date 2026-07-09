@@ -14,8 +14,8 @@
  * (our own scored statlines), which overrides the estimate for that row.
  */
 import { fetchJson } from "./lib/mlb.mjs";
-import { CFG, etDate } from "./lib/league.mjs";
-import Scoring from "../../shared/scoring.js";
+import { etDate } from "./lib/league.mjs";
+import { outsOf, seasonFantasyPoints } from "./lib/season-score.mjs";
 
 const json = (body, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -24,12 +24,6 @@ const json = (body, status = 200) =>
   });
 
 const num = (v) => (Number.isFinite(+v) ? +v : 0);
-function ipToOuts(ip) {
-  const s = String(ip == null ? "" : ip).split(".");
-  return num(s[0]) * 3 + num(s[1]);
-}
-const outsOf = (stat) =>
-  Number.isFinite(+stat.outs) ? +stat.outs : ipToOuts(stat.inningsPitched);
 
 // Counting fields we sum across a season's team-splits, per group.
 const HIT_FIELDS = ["gamesPlayed", "plateAppearances", "atBats", "runs", "hits",
@@ -45,16 +39,6 @@ function emptySum(fields) {
 function addInto(acc, stat, fields, pitching) {
   fields.forEach((f) => (acc[f] += num(stat[f])));
   if (pitching) acc.outs = (acc.outs || 0) + outsOf(stat);
-}
-
-function fantasyPoints(sum, pitching) {
-  if (!pitching) return Scoring.round1(Scoring.scoreHitting(sum));
-  // Reuse the engine for every pitching component except QS (a season aggregate
-  // would spuriously read as one giant "start"); zero gamesStarted disables the
-  // engine's per-game QS, then add the real season quality-start bonus.
-  const qsWeight = (CFG.SCORING && CFG.SCORING.pitching && CFG.SCORING.pitching.QS) || 5;
-  const base = Scoring.scorePitching({ ...sum, gamesStarted: 0 });
-  return Scoring.round1(base + num(sum.qualityStarts) * qsWeight);
 }
 
 // Pure: MLB yearByYear payload → per-season rows (newest first) + career total.
@@ -84,7 +68,7 @@ export function careerFromStats(api, group, currentSeason) {
       team: r.teams.length === 1 ? r.teams[0] : (r.teams.length ? r.teams.length + "TM" : "—"),
       numTeams: r.teams.length,
       stat: r.sum,
-      fp: fantasyPoints(r.sum, pitching),
+      fp: seasonFantasyPoints(r.sum, pitching),
     }))
     .sort((a, b) => (a.season < b.season ? 1 : -1));
 
@@ -92,7 +76,7 @@ export function careerFromStats(api, group, currentSeason) {
   if (pitching) total.outs = 0;
   rows.forEach((r) => fields.forEach((f) => (total[f] += num(r.stat[f]))));
   if (pitching) rows.forEach((r) => (total.outs += num(r.stat.outs)));
-  const career = { stat: total, fp: fantasyPoints(total, pitching) };
+  const career = { stat: total, fp: seasonFantasyPoints(total, pitching) };
 
   return { group, rows, career, season: currentSeason };
 }

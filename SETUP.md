@@ -129,6 +129,32 @@ and then during the season, run `node scripts/export_firestore.mjs` (needs the s
 `FIREBASE_SERVICE_ACCOUNT_B64` env var) to dump every collection to a timestamped JSON
 file you can keep.
 
+## Backfilling stats (mid-season start or after an outage)
+
+The nightly jobs only ever score **yesterday**. If the league started mid-season, or the
+ingest was down for a stretch, earlier game logs and weekly scores are missing. Two things
+to know:
+
+- **Season-to-date totals self-heal.** A player's SEASON total is recomputed every night
+  from his complete MLB season stats — so once the jobs are running, force one
+  **daily-rollover** (Netlify → Functions → daily-rollover → *Run*) and the SEASON tile,
+  the player-card Stats tab, and the free-agent sort are correct, no replay needed.
+- **Game logs + past weekly standings need a replay.** Run, locally, with the same
+  `FIREBASE_SERVICE_ACCOUNT_B64` env var:
+
+  ```
+  node scripts/backfill_days.mjs --from 2026-03-27 --to 2026-07-08
+  ```
+
+  It rebuilds each day's statlines, then finalizes ended weeks and reconciles season points.
+  Two caveats:
+  1. **Past daily lineups aren't recoverable** — the app wasn't setting them then, so those
+     days are scored from each team's **current** roster. Weekly H2H results are a plausible
+     reconstruction, not what actually would have been started.
+  2. **Firestore's free tier caps ~20,000 writes/day** and a full season is more than that,
+     so run it in **chunks** (a few weeks per day, e.g. `--from … --to …` a couple weeks at a
+     time) or it will hit the quota and stop partway.
+
 ## Every season
 
 - Bump `LEAGUE.season` in `shared/league-config.js` and `SYNC_PATH` in
